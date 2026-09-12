@@ -1,0 +1,264 @@
+# Argusd — Project Brief
+
+## Context for the agent
+
+You are helping build a hackathon MVP called **Argusd**. Read this whole
+document before writing any code. Two people are working on this in
+parallel — task ownership is marked below as **[A]** or **[B]**. There is a
+**Review 1 checkpoint at the 3-hour mark**, so prioritize getting that
+milestone working and demonstrable over anything later in the roadmap.
+
+## The problem
+
+AI coding agents build a mental model of a codebase as they work — "this
+file has no tests," "the server runs on port 3000," "this branch is clean."
+That model is frozen at the moment it was observed. Nothing tells the agent
+when it stops being true. If a file changes, a config value changes, or git
+state shifts (from the user, another process, or another agent), the agent
+keeps acting on the old belief until it happens to re-check — which it
+usually doesn't, because nothing prompts it to.
+
+Existing tools solve adjacent problems (blocking dangerous commands, giving
+agents long-term memory) but nothing tracks the **freshness** of what an
+agent already believes.
+
+## The pitch
+
+"Every AI agent remembers what it saw. None of them know when what they saw
+stopped being true. Argusd timestamps every claim an agent makes about code
+or config, and the instant the underlying source changes, it invalidates
+that claim before the agent acts on stale information."
+
+## How this differs from existing tools
+
+- **Memory / RAG tools** store what an agent has seen, but never check if
+  it's still true.
+- **Command blockers / firewalls** (Claude Code hooks, MCP firewalls) judge
+  whether an action is dangerous, but ignore whether the reasoning behind
+  that action is outdated.
+- **Argusd** does neither of those — it puts an expiration date on facts the
+  agent already has, and cancels that fact the moment its source changes.
+  It's not more memory, and it's not a bouncer at the door.
+
+## Core mechanic
+
+1. The agent records a claim via an MCP tool, tied to a specific source (a
+   file, a git ref, or a config key).
+2. A passive watcher hashes that source continuously, independent of the
+   agent — this costs zero agent tokens.
+3. The moment a source's hash changes, every claim depending on it flips to
+   `stale`, with no agent action required.
+4. Before acting on a prior claim, the agent calls a freshness-check tool and
+   gets back `FRESH` or `STALE: changed at <timestamp>`.
+5. A live dashboard shows the claim timeline and invalidation events, for
+   the demo.
+
+## Data model (SQLite)
+
+```sql
+CREATE TABLE claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'fresh', -- 'fresh' | 'stale'
+    stale_at TEXT
+);
+
+CREATE TABLE sources (
+    key TEXT PRIMARY KEY,           -- e.g. "auth.ts", ".env:PORT", "git:HEAD"
+    last_hash TEXT NOT NULL,
+    last_checked TEXT NOT NULL
+);
+```
+
+Keep this flat. No graph database. A claim points at exactly one source key;
+a source key can invalidate many claims when it changes.
+
+## Source types, in build priority order
+
+1. **File content** — SHA256 of full file bytes. Baseline case: "this
+   function does X."
+2. **Git state** — hash of HEAD commit + branch name + a boolean for
+   working-tree-clean. Lets you demo: "you're on main with no uncommitted
+   changes" going stale the instant that changes.
+3. **Config keys** (`.env`, optionally `package.json` / `docker-compose.yml`)
+   — hash each key's *value* individually, not the whole file. Editing an
+   unrelated line in `.env` must NOT invalidate a claim about `PORT` unless
+   `PORT` itself changed.
+
+   ```python
+   def parse_env_hashes(path):
+       hashes = {}
+       for line in open(path):
+           line = line.strip()
+           if not line or line.startswith("#") or "=" not in line:
+               continue
+           key, value = line.split("=", 1)
+           hashes[key.strip()] = hashlib.sha256(value.strip().encode()).hexdigest()
+       return hashes  # {"PORT": "a1b2...", "DATABASE_URL": "9f8e..."}
+   ```
+
+   **Never store or display raw values** — only hashes and a changed
+   boolean. The dashboard shows `.env:PORT — CHANGED at 14:32`, never the
+   actual old/new values.
+
+## MCP tools to expose
+
+Keep tool descriptions short and return values terse (a status word + a
+timestamp, never full file contents). This keeps token overhead small — the
+schema for these three tools sits in the agent's context every turn
+regardless of use.
+
+- `record_claim(text: str, source_key: str) -> claim_id`
+  Hashes the source right now, stores the claim as fresh.
+- `check_freshness(claim_id: int) -> {status, changed_at?}`
+  Rehashes the source, compares to the stored hash, flips status if
+  different, returns the verdict.
+- `list_stale() -> [{claim_id, text, source_key, stale_at}]`
+  Everything currently stale — meant to be called by the agent at the start
+  of a task or before a risky action, as a self-audit.
+
+## Architecture
+
+```
+Agent (Claude Code / Codex / OpenCode)
+        │ MCP
+        ▼
+     Argusd MCP server (Python)             [A]
+        │
+   ┌────┼────────────┐
+   ▼    ▼             ▼
+ Files  Git          Config keys
+ (watchdog)  (.git/HEAD watch)   (.env parser)      [A]
+        │
+        ▼
+     SQLite (claims, sources)                [A]
+        │
+        ▼
+  Next.js dashboard (WebSocket live feed)     [B]
+```
+
+No browser/CDP integration, no Tree-sitter/LSP dependency graph, no
+recovery/checkpoint system — out of scope for this build.
+
+## File structure
+
+```
+argusd/
+  server/
+    main.py            # MCP server entrypoint, tool definitions        [A]
+    db.py               # SQLite schema + claim/source CRUD             [A]
+    hashing.py           # file hash, git-state hash, env-key hash fns  [A]
+    watcher.py            # watchdog-based filesystem + git watcher     [A]
+    parsers/
+      env.py              # .env key-level parser                      [A]
+  dashboard/
+    (Next.js app)                                                       [B]
+      app/page.tsx        # single live-updating page                  [B]
+      app/api/ws/route.ts  # WebSocket feed from SQLite / watcher       [B]
+  demo/
+    seed_claims.py         # scripted demo: record a couple of claims  [B]
+    trigger_change.py       # scripted demo: flips a value on cue      [B]
+  CLAUDE.md
+  README.md
+```
+
+## Team workflow (2 people)
+
+**Person A — core engine.** Owns `server/`: data model, hashing, MCP
+tools, watcher, config parsing. This is the part that has to be *correct*,
+since it's the whole idea — prioritize it being right over being fast.
+
+**Person B — dashboard + demo tooling.** Owns `dashboard/` and `demo/`:
+the live view, the WebSocket feed, and the scripted demo triggers. Can build
+against a stub/mock of the DB schema before Person A's engine is fully wired,
+since the schema is fixed up front and won't change shape.
+
+Work in parallel from hour 0. Sync briefly before Review 1 to confirm the
+DB schema hasn't drifted between what A implemented and what B is reading
+from.
+
+## Roadmap with Review 1 at hour 3
+
+### Before Review 1 (Hours 0–3)
+
+- **[A]** Implement `db.py` (schema above) and `hashing.py` (file hashing +
+  a stub for git/env hashing). Test from a Python REPL: insert a claim,
+  hash a file, change the file, rehash, confirm the hash differs. This is
+  the core proof-of-concept and should be demonstrable standalone.
+- **[B]** Scaffold the repo: Next.js app skeleton, MCP server skeleton with
+  one dummy tool (e.g. `ping`) so the agent connection path is proven end to
+  end, and a placeholder dashboard page. Also scaffold `demo/` folder
+  structure.
+
+**Review 1 deliverable:** show (1) hash-change detection working live in a
+REPL or a short script, and (2) an MCP client (or Claude Code itself)
+successfully calling a dummy tool on the server. This proves both halves of
+the architecture are reachable before building the real logic on top.
+
+### After Review 1 (Hours 3–36)
+
+3. **Hours 3–8 — MCP tools, wired.** **[A]** Implement `record_claim`,
+   `check_freshness`, `list_stale` for real, wired to `db.py`. **[B]** Wire
+   the dashboard skeleton to read directly from the SQLite file (polling is
+   fine for now) so there's a visible claims list, even if static.
+4. **Hours 8–14 — Filesystem + git watcher.** **[A]** `watchdog` on the repo
+   directory; on save, rehash and flip dependent claims stale immediately,
+   independent of any agent call. Extend to git-state claims (branch,
+   commit, clean-tree) and log every invalidation event. **[B]** Replace
+   dashboard polling with a real WebSocket feed driven by watcher events.
+5. **Hours 14–20 — Config-key claims + dashboard polish.** **[A]** Implement
+   `parsers/env.py`; diff old vs. new key-hash maps on save so only the
+   changed key's claims go stale. **[B]** Claim list UI: color-coded
+   fresh/stale, event log underneath ("`.env:PORT` changed at 14:32 →
+   invalidated 1 claim").
+6. **Hours 20–28 — Integration.** Both: connect the MCP server to a real
+   Claude Code session. Script a task where a claim goes stale mid-session
+   and the agent's next `check_freshness` or `list_stale` call catches it.
+   Build out `demo/seed_claims.py` and `demo/trigger_change.py` together.
+7. **Hours 28–33 — Full run-throughs.** Both: run the complete demo end to
+   end multiple times, fix whatever breaks under real conditions.
+8. **Hours 33–36 — Rehearse and de-risk.** Time-box a 90-second run-through
+   3–4 times. If any live watcher trigger is flaky on stage, fall back to
+   the scripted `trigger_change.py` instead of live-editing a file in a
+   second terminal — reliability beats realism for the actual demo slot.
+
+## Demo script (90 seconds)
+
+1. Agent works on `auth.ts`, records a claim: "no other files import this."
+2. `demo/trigger_change.py` runs: makes a second file import `auth.ts`, and
+   separately flips `PORT=3000` to `PORT=4000` in `.env`.
+3. Dashboard flips both claims to stale in real time, timestamped.
+4. Agent calls `list_stale()` before its next action, sees both flags, and
+   re-verifies instead of acting on outdated beliefs.
+5. Closing line: memory tools tell an agent what it saw; this tells it when
+   what it saw stopped being true.
+
+## Token-cost design constraints (keep these in mind while coding)
+
+- Fixed cost: the 3 tool schemas sit in the agent's context every turn
+  regardless of use — keep descriptions and parameter lists minimal.
+- Variable cost: each tool call adds a tool_use/tool_result pair to
+  context — keep `check_freshness` and `list_stale` responses to a status
+  word and a timestamp, never full file contents or claim history dumps.
+- The filesystem/git watcher must do all its work outside the model — zero
+  agent tokens spent on passive invalidation.
+- Do not build any mechanism that force-injects a "check freshness" reminder
+  into every turn — that's the anti-pattern that would make this expensive.
+  Rely on the agent calling `list_stale()` at natural checkpoints instead.
+
+## What is explicitly out of scope for this build
+
+- Blocking dangerous shell/git commands (solved elsewhere, not this
+  project's differentiator).
+- Tree-sitter/LSP-based dependency/impact graphs.
+- Browser/DOM/console state tracking.
+- Task recovery / checkpoint / "resume" style features.
+- Multi-repo or multi-agent support.
+
+Start now: **[A]** scaffold `server/db.py` and `server/hashing.py` and
+confirm hash-change detection from a REPL. **[B]** scaffold the Next.js
+dashboard and a dummy-tool MCP server so the connection path to Claude Code
+is proven. Both should be ready to demo by hour 3 for Review 1.
