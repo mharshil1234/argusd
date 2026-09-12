@@ -4,17 +4,24 @@
 
 If the `argusd` MCP tools are available in this session, call `list_stale()`
 once at the start of a task before making changes, and again before any
-risky action — not on every turn, just at natural checkpoints. If it
-reports anything stale, re-verify with `check_freshness` before acting on
-it instead of proceeding on a possibly-outdated belief.
+risky action — not on every turn, just at natural checkpoints.
 
-**This habit is read-only and report-only.** Calling `list_stale`/
-`check_freshness` and telling the user what they returned is the entire
-habit. Do not run scripts, edit files, reset the demo workspace, or take
-any other action as part of this check unless the user separately and
-explicitly asks for it in that same turn — an ambiguous prompt like "let's
-continue" means "tell me what's stale," not "go verify or fix the
-pipeline yourself."
+For each claim `list_stale()` reports, this habit includes one further
+step, automatically, without being asked: read the actual current content
+of that specific claim's source (the one file, or the one `.env` key it
+names — nothing else) and call `record_claim` with updated text reflecting
+what's true now. Then briefly report what was found stale and what was
+just re-recorded. The old stale claim is never deleted or un-staled —
+recording a new one is how the belief gets updated.
+
+**This habit is scoped to exactly that — checking and refreshing claims —
+and nothing else.** Do not run scripts (`seed_claims.py`, `trigger_change.py`,
+tests, etc.), reset the demo workspace, edit files other than reading the
+specific stale sources named by `list_stale()`, make commits, or take any
+other action as part of this habit, even on an ambiguous prompt like "let's
+continue" — that phrase means "check and refresh claims," nothing broader.
+Anything beyond checking/refreshing needs a separate, explicit ask in that
+same turn.
 
 ## Context for the agent
 
