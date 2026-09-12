@@ -19,6 +19,7 @@ venv/
 dashboard/node_modules/
 dashboard/.next/
 dashboard/out/
+*.tsbuildinfo
 
 # Editor / OS
 .DS_Store
