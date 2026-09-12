@@ -8,6 +8,14 @@ risky action — not on every turn, just at natural checkpoints. If it
 reports anything stale, re-verify with `check_freshness` before acting on
 it instead of proceeding on a possibly-outdated belief.
 
+**This habit is read-only and report-only.** Calling `list_stale`/
+`check_freshness` and telling the user what they returned is the entire
+habit. Do not run scripts, edit files, reset the demo workspace, or take
+any other action as part of this check unless the user separately and
+explicitly asks for it in that same turn — an ambiguous prompt like "let's
+continue" means "tell me what's stale," not "go verify or fix the
+pipeline yourself."
+
 ## Context for the agent
 
 You are helping build a hackathon MVP called **Argusd**. Read this whole
@@ -83,6 +91,18 @@ what's still pending — this block only tracks what's actually done so far.
   live on Linux after the fix. The "Hours 28–33 complete"/"Hours 33–36
   rehearsal-ready" claims above are the teammate's own report from their
   (Windows/Codex) side; not independently re-verified from this session.
+- **Independent re-verification (this session, Linux):** ran the full
+  `demo/seed_claims.py` → watcher → dashboard → `trigger_change.py` loop
+  end to end using the pre-existing `.venv` and a live `server/watcher.py`
+  already running against `demo/.run/argusd.db`. Confirmed, via direct file
+  edits with zero MCP calls, that the watcher independently flips all three
+  source types — `auth.ts`, `routes.ts`, and `.env:PORT` (only the changed
+  key, `routes.ts`/other keys left untouched) — and that `dashboard`'s
+  `/api/claims` and the `invalidation_events` table reflect each transition
+  live. This confirms the core mechanic and the 90-second rehearsal script
+  work on Linux from this session, not just the teammate's Windows/Codex
+  report above. Workspace was reset back to a clean fresh state afterward
+  via `--reset`.
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 
