@@ -18,6 +18,9 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
 - `dashboard/` reads that same database without creating or migrating it,
   and exposes both `GET /api/claims` (manual/debug) and a live
   `GET /api/events` Server-Sent Events feed the UI subscribes to.
+- The live dashboard includes a durable invalidation timeline backed by the
+  `invalidation_events` table; recent events survive page reloads and feed
+  reconnects.
 - `demo/` contains a repeatable file-backed stale-claim walkthrough.
 
 `.env` config-key claims and the dashboard's invalidation-timeline UI
@@ -90,7 +93,8 @@ state until the root database and schema exist, then displays claims newest
 first with fresh/stale counts, updating live over Server-Sent Events as the
 watcher invalidates claims — no manual refresh or client-side polling. It
 only exposes claim ID, text, source key, timestamps, and freshness status;
-source hashes never enter the API response.
+source hashes never enter the API response. The event log shows the source,
+time, and number of claims invalidated, and remains available after reload.
 
 The database path can be overridden for both the MCP server and dashboard,
 which is useful for testing and alternate checkouts:

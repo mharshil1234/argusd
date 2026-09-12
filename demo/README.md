@@ -43,3 +43,7 @@ roadmap work; git-state claims and the passive filesystem/git watcher
 (`server/watcher.py`) are implemented as of Hours 8–14 but not yet wired
 into this scripted walkthrough. The generated workspace is ignored by Git
 and can be safely recreated with `--reset`.
+
+When the watcher is used with the dashboard, each actual invalidation is
+also retained in the dashboard's event log. Reloading the page does not
+erase those events; only the latest 20 are displayed.

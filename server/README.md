@@ -56,6 +56,10 @@ every invalidation to stdout as `[STALE] <source_key> changed at <ts> ->
 invalidated claim ids [...]`. Set `ARGUSD_DB_PATH` the same way as for
 `main.py` if you're pointing at a non-default database.
 
+Each real fresh-to-stale transition is also recorded in the additive
+`invalidation_events` table. The dashboard reads the latest 20 events
+read-only through its SSE feed, so the timeline survives browser reloads.
+
 ## Verify
 
 The integration client starts the server over stdio and calls all three tools:
