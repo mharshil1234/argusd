@@ -41,23 +41,26 @@ what's still pending — this block only tracks what's actually done so far.
   table, a durable event-log UI on the dashboard (survives reloads), and a
   watcher robustness fix (`Debouncer.close()` / `observer.unschedule_all()`
   so no debounced callback fires after teardown).
-- **Hours 20–28 — in progress.** Root `.mcp.json` registers `server/main.py`
-  as a stdio MCP server for Claude Code; verified the exact command/args/cwd
-  Claude Code will use over a real stdio round-trip (`list_tools` +
-  `record_claim`). `demo/` now seeds and triggers a third claim,
-  `.env:PORT`, alongside `auth`/`routes` (`demo/mcp_client.py`'s
+- **Hours 20–28 — done.** Root `.mcp.json` registers `server/main.py` as a
+  stdio MCP server for Claude Code (`command` must be `.venv/bin/python`,
+  not bare `python` — the system interpreter lacks the `mcp` package,
+  which caused an immediate `CONNECTION_CLOSED` the first time this was
+  tried against a real session). `demo/` now seeds and triggers a third
+  claim, `.env:PORT`, alongside `auth`/`routes` (`demo/mcp_client.py`'s
   `mcp_session` gained an `env_path` param for `ARGUSD_ENV_PATH`), and
   `--claim auth` now also writes a narrative-only `login.ts` that imports
   `auth.ts` (not tracked — no import-graph/dependency tracking, out of
   scope by design), matching CLAUDE.md's own demo script. `demo/README.md`
   documents starting `server/watcher.py` before `trigger_change.py` so
   invalidations are watcher-driven and live on the dashboard, not just
-  `trigger_change.py`'s own `check_freshness` call. **Still open:**
-  actually driving the tools from a live Claude Code session — MCP servers
-  load at session start, so this couldn't be exercised from inside the
-  session that added `.mcp.json`; needs a fresh Claude Code session opened
-  in this repo (approve the one-time prompt) to confirm end-to-end. Hours
-  28–33 (full run-throughs) and 33–36 (rehearsal) are not yet started.
+  `trigger_change.py`'s own `check_freshness` call. The full pitch was
+  verified end-to-end with real, separate `claude -p` sessions (not the
+  scripted `mcp_client.py` test double): one session called `record_claim`
+  on a scratch file; the file was then changed outside any agent turn;
+  `server/watcher.py` flipped the claim stale with zero agent tokens
+  spent; the same session was resumed and its `list_stale()` call
+  surfaced the drift immediately. Hours 28–33 (full run-throughs) and
+  33–36 (rehearsal) are not yet started.
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 
