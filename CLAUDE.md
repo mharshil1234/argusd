@@ -1,5 +1,13 @@
 # Argusd — Project Brief
 
+## Self-audit habit (dogfooding Argusd itself)
+
+If the `argusd` MCP tools are available in this session, call `list_stale()`
+once at the start of a task before making changes, and again before any
+risky action — not on every turn, just at natural checkpoints. If it
+reports anything stale, re-verify with `check_freshness` before acting on
+it instead of proceeding on a possibly-outdated belief.
+
 ## Context for the agent
 
 You are helping build a hackathon MVP called **Argusd**. Read this whole
