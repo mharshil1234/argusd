@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ClaimsResponse, DashboardClaim } from "../lib/claims-reader";
+import type { DashboardClaim, DashboardSnapshot, InvalidationEvent } from "../lib/claims-reader";
 
-const initialResponse: ClaimsResponse = { state: "waiting", claims: [], summary: { total: 0, fresh: 0, stale: 0 }, generatedAt: "", message: "Connecting to Argusd…" };
+const initialResponse: DashboardSnapshot = { state: "waiting", claims: [], events: [], summary: { total: 0, fresh: 0, stale: 0 }, generatedAt: "", message: "Connecting to Argusd…" };
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "—";
@@ -23,10 +23,15 @@ function ClaimRow({ claim }: { claim: DashboardClaim }) {
   );
 }
 
+function EventRow({ event }: { event: InvalidationEvent }) {
+  const countLabel = `${event.invalidatedCount} claim${event.invalidatedCount === 1 ? "" : "s"}`;
+  return <li className="event-row"><span className="event-mark" aria-hidden="true" /><div><p><code>{event.sourceKey}</code> changed <span aria-hidden="true">→</span> invalidated {countLabel}</p><time dateTime={event.occurredAt}>{formatTimestamp(event.occurredAt)}</time></div></li>;
+}
+
 type FeedState = "connecting" | "open" | "error";
 
 export default function Home() {
-  const [data, setData] = useState<ClaimsResponse>(initialResponse);
+  const [data, setData] = useState<DashboardSnapshot>(initialResponse);
   const [loading, setLoading] = useState(true);
   const [feedState, setFeedState] = useState<FeedState>("connecting");
 
@@ -40,7 +45,7 @@ export default function Home() {
     source.onmessage = (event) => {
       if (!active) return;
       try {
-        setData(JSON.parse(event.data) as ClaimsResponse);
+        setData(JSON.parse(event.data) as DashboardSnapshot);
         setLoading(false);
         setFeedState("open");
       } catch {
@@ -78,7 +83,12 @@ export default function Home() {
         {loading ? <div className="state-card" role="status"><span className="spinner" />Reading claims…</div>
           : data.state !== "ready" ? <div className={`state-card state-${data.state}`} role="status" aria-live="polite"><strong>{data.state === "waiting" ? "Argusd is ready for data" : "Claims are temporarily unavailable"}</strong><p>{data.message}</p>{data.state === "waiting" && <code>python -c &quot;from server.db import connect, init_db; c=connect(); init_db(c)&quot;</code>}</div>
           : data.claims.length === 0 ? <div className="state-card" role="status"><strong>No claims recorded yet</strong><p>Call the MCP record_claim tool to populate this view.</p></div>
-          : <div className="claims-list">{data.claims.map((claim) => <ClaimRow key={claim.id} claim={claim} />)}</div>}
+           : <div className="claims-list">{data.claims.map((claim) => <ClaimRow key={claim.id} claim={claim} />)}</div>}
+      </section>
+
+      <section className="events-panel" aria-labelledby="events-heading">
+        <div className="panel-header"><div><p className="section-kicker">PERSISTED INVALIDATIONS</p><h2 id="events-heading">Event log</h2></div><span className="panel-meta">{data.events.length} recent</span></div>
+        {data.events.length === 0 ? <div className="event-empty" role="status">No invalidations recorded yet.</div> : <ol className="events-list">{data.events.map((event) => <EventRow key={event.id} event={event} />)}</ol>}
       </section>
 
       <footer><span>Hashes and raw config values never leave the server.</span><span>Live updates via Server-Sent Events.</span></footer>

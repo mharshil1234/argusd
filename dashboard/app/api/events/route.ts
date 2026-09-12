@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { readClaims, resolveDatabasePath } from "../../../lib/claims";
-import type { ClaimsResponse } from "../../../lib/claims";
+import { readClaims, readEvents, resolveDatabasePath } from "../../../lib/claims";
+import type { DashboardSnapshot } from "../../../lib/claims";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,17 +23,26 @@ export function GET() {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (payload: ClaimsResponse) => {
+      const snapshot = (): DashboardSnapshot => {
+        const claims = readClaims(dbPath);
+        try {
+          return { ...claims, events: claims.state === "ready" ? readEvents(dbPath) : [] };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown SQLite error";
+          return { state: "error", claims: [], events: [], summary: { total: 0, fresh: 0, stale: 0 }, generatedAt: new Date().toISOString(), message: `Unable to read invalidation events: ${message}` };
+        }
+      };
+      const send = (payload: DashboardSnapshot) => {
         if (closed) return;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
       };
 
       const scheduleRefresh = () => {
         if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => send(readClaims()), DEBOUNCE_MS);
+        debounceTimer = setTimeout(() => send(snapshot()), DEBOUNCE_MS);
       };
 
-      send(readClaims()); // initial snapshot on connect
+      send(snapshot()); // initial snapshot on connect
 
       try {
         dirWatcher = fs.watch(dbDir, { persistent: false }, (_event, filename) => {

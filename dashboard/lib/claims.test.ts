@@ -6,7 +6,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { readClaims } from "./claims-reader";
+import { readClaims, readEvents } from "./claims-reader";
 
 const schema = `
 CREATE TABLE claims (
@@ -17,6 +17,12 @@ CREATE TABLE claims (
   created_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'fresh',
   stale_at TEXT
+);
+CREATE TABLE invalidation_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_key TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  invalidated_count INTEGER NOT NULL
 );`;
 
 function withTempPath(run: (dbPath: string) => void) {
@@ -72,5 +78,35 @@ test("reports malformed databases without throwing", () => {
     const result = readClaims(dbPath);
     assert.equal(result.state, "error");
     assert.match(result.message ?? "", /Unable to read claims/);
+  });
+});
+
+test("reads recent invalidation events without exposing hashes", () => {
+  withTempPath((dbPath) => {
+    const database = new Database(dbPath);
+    database.exec(schema);
+    const insert = database.prepare(
+      "INSERT INTO invalidation_events (source_key, occurred_at, invalidated_count) VALUES (?, ?, ?)",
+    );
+    for (let index = 0; index < 22; index += 1) {
+      insert.run(`source-${index}.ts`, `2026-01-01T00:${String(index).padStart(2, "0")}:00Z`, index + 1);
+    }
+    database.close();
+
+    const events = readEvents(dbPath);
+    assert.equal(events.length, 20);
+    assert.equal(events[0].sourceKey, "source-21.ts");
+    assert.equal(events[0].invalidatedCount, 22);
+    assert.equal(events.at(-1)?.sourceKey, "source-2.ts");
+    assert.equal(JSON.stringify(events).includes("source_hash"), false);
+  });
+});
+
+test("returns no events for a pre-event database", () => {
+  withTempPath((dbPath) => {
+    const database = new Database(dbPath);
+    database.exec(schema.replace(/CREATE TABLE invalidation_events[\s\S]*?;\s*$/, ""));
+    database.close();
+    assert.deepEqual(readEvents(dbPath), []);
   });
 });
