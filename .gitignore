@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Argusd runtime data (never committed — this is generated state, and
+# .env holds secrets the project explicitly must not persist raw values from)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Dashboard (Next.js)
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+
+# Editor / OS
+.DS_Store
+*.swp
