@@ -42,8 +42,10 @@ what's still pending — this block only tracks what's actually done so far.
   watcher robustness fix (`Debouncer.close()` / `observer.unschedule_all()`
   so no debounced callback fires after teardown).
 - **Hours 20–28 — done.** Root `.mcp.json` registers `server/main.py` as a
-  stdio MCP server for Claude Code (`command` must be `.venv/bin/python`,
-  not bare `python` — the system interpreter lacks the `mcp` package,
+  stdio MCP server for Claude Code (`command` must point to the platform's
+  virtual-environment interpreter — `.venv\\Scripts\\python.exe` on
+  Windows, `.venv/bin/python` on Unix — not bare `python`, because the
+  system interpreter may lack the `mcp` package,
   which caused an immediate `CONNECTION_CLOSED` the first time this was
   tried against a real session). `demo/` now seeds and triggers a third
   claim, `.env:PORT`, alongside `auth`/`routes` (`demo/mcp_client.py`'s

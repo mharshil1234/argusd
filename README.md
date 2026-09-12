@@ -64,7 +64,8 @@ claim as stale. `list_stale` returns the stale claim summary.
 **Claude Code:** the repo-root `.mcp.json` registers this server already —
 open Claude Code in this directory, approve the one-time "project requires
 approval to run MCP servers" prompt, and `record_claim`/`check_freshness`/
-`list_stale` are available to the session immediately.
+`list_stale` are available to the session immediately. The checked-in command
+uses `.venv\\Scripts\\python.exe` on Windows; use `.venv/bin/python` on Unix.
 
 For an HTTP/SSE client or MCP inspector:
 

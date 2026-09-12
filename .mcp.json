@@ -2,7 +2,7 @@
   "mcpServers": {
     "argusd": {
       "type": "stdio",
-      "command": ".venv/bin/python",
+      "command": ".venv\\Scripts\\python.exe",
       "args": ["server/main.py"]
     }
   }
