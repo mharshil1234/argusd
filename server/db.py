@@ -117,5 +117,5 @@ def mark_source_claims_stale(conn: sqlite3.Connection, source_key: str) -> list[
 
 def list_stale_claims(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT id, text, source_key, stale_at FROM claims WHERE status = 'stale'"
+        "SELECT id AS claim_id, text, source_key, stale_at FROM claims WHERE status = 'stale'"
     ).fetchall()

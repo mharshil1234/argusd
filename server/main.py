@@ -1,23 +1,77 @@
-"""Argusd MCP server scaffold for the Review 1 connection proof."""
+"""Argusd MCP server: record_claim, check_freshness, list_stale.
+
+Wired to db.py against a persistent SQLite file (server/argusd.db) so
+claims survive across tool calls within a session. Tool descriptions
+and return values are kept terse by design (a status word and a
+timestamp, never file contents) to minimize per-turn token overhead.
+"""
 
 import argparse
-from datetime import datetime, timezone
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+import db
+from hashing import hash_source
+
+DB_PATH = Path(__file__).resolve().parent / "argusd.db"
 
 mcp = FastMCP("argusd")
 
 
+def _get_conn():
+    conn = db.connect(DB_PATH)
+    db.init_db(conn)
+    return conn
+
+
 @mcp.tool()
-def ping() -> str:
-    """Confirm that the Argusd MCP server is reachable."""
-    timestamp = datetime.now(timezone.utc).isoformat()
-    return f"PONG {timestamp}"
+def record_claim(text: str, source_key: str) -> int:
+    """Record a claim tied to a source (file path). Hashes it now, stores it fresh. Returns claim_id."""
+    conn = _get_conn()
+    try:
+        source_hash = hash_source(source_key)
+        return db.insert_claim(conn, text, source_key, source_hash)
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def check_freshness(claim_id: int) -> dict:
+    """Rehash a claim's source; flips it stale if changed. Returns status and changed_at if stale."""
+    conn = _get_conn()
+    try:
+        claim = db.get_claim(conn, claim_id)
+        if claim is None:
+            raise ValueError(f"no claim with id {claim_id}")
+        if claim["status"] == "fresh":
+            try:
+                current_hash = hash_source(claim["source_key"])
+            except FileNotFoundError:
+                current_hash = None  # a deleted source counts as changed
+            if current_hash != claim["source_hash"]:
+                db.mark_stale(conn, claim_id)
+                claim = db.get_claim(conn, claim_id)
+        result = {"status": claim["status"]}
+        if claim["status"] == "stale":
+            result["changed_at"] = claim["stale_at"]
+        return result
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def list_stale() -> list[dict]:
+    """List every claim currently marked stale (id, text, source_key, stale_at)."""
+    conn = _get_conn()
+    try:
+        return [dict(row) for row in db.list_stale_claims(conn)]
+    finally:
+        conn.close()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the Argusd MCP scaffold.")
+    parser = argparse.ArgumentParser(description="Run the Argusd MCP server.")
     parser.add_argument(
         "--transport",
         choices=("stdio", "sse"),

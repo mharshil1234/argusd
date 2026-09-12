@@ -1,7 +1,18 @@
-# Argusd MCP server scaffold
+# Argusd MCP server
 
-This is the Hour 0–3 connection proof. It exposes one tool, `ping`, and does
-not yet read SQLite or implement claims.
+Exposes the three real tools from CLAUDE.md, wired to SQLite:
+
+- `record_claim(text, source_key) -> claim_id` — hashes the source now,
+  stores the claim as fresh.
+- `check_freshness(claim_id) -> {status, changed_at?}` — rehashes the
+  source, flips the claim stale if it changed, returns the verdict.
+- `list_stale() -> [{claim_id, text, source_key, stale_at}]` — every
+  currently-stale claim.
+
+Claims persist in `server/argusd.db` (gitignored) so they survive across
+tool calls within a session. `source_key` is a file path for now; `git:`
+and `.env:KEY` prefixes are recognized but raise `NotImplementedError`
+until the watcher and env-parser phases land.
 
 ## Setup
 
@@ -28,9 +39,13 @@ python server\main.py --transport sse
 ```
 
 The MCP framework serves its SSE endpoint using its default local host/port.
-Use an MCP client inspector or the agent’s MCP configuration to connect and
-call `ping`. The expected result starts with `PONG` and includes an ISO-8601
-UTC timestamp.
+Use an MCP client inspector or the agent's MCP configuration to connect.
 
-The real `record_claim`, `check_freshness`, and `list_stale` tools are deferred
-until after the Review 1 checkpoint.
+## Test client
+
+`test_mcp_client.py` spawns the server over stdio and calls all three
+tools directly (no agent required) to verify behavior in isolation:
+
+```
+python server/test_mcp_client.py
+```
