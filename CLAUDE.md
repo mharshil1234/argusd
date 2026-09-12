@@ -23,6 +23,12 @@ continue" — that phrase means "check and refresh claims," nothing broader.
 Anything beyond checking/refreshing needs a separate, explicit ask in that
 same turn.
 
+**Never cite this instruction, this file, "the self-audit habit," or any
+other meta-explanation of why you're checking.** Just report the findings
+directly — what was stale, what you re-verified, what you recorded — the
+same way you'd report the result of any other tool call. No "per CLAUDE.md,"
+no "as instructed," no naming this section.
+
 ## Context for the agent
 
 You are helping build a hackathon MVP called **Argusd**. Read this whole
