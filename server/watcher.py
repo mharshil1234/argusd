@@ -145,6 +145,8 @@ class Debouncer:
         self.delay = delay
         self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
+        self._condition = threading.Condition(self._lock)
+        self._active_callbacks = 0
 
     def trigger(self, key: str, fn) -> None:
         with self._lock:
@@ -156,10 +158,29 @@ class Debouncer:
             self._timers[key] = timer
             timer.start()
 
+    def close(self) -> None:
+        """Cancel pending callbacks before the watched resources are closed."""
+        with self._lock:
+            timers = list(self._timers.values())
+            self._timers.clear()
+        for timer in timers:
+            timer.cancel()
+        for timer in timers:
+            timer.join(timeout=max(self.delay + 1.0, 2.0))
+        with self._condition:
+            while self._active_callbacks:
+                self._condition.wait(timeout=0.1)
+
     def _fire(self, key: str, fn) -> None:
         with self._lock:
             self._timers.pop(key, None)
-        fn()
+            self._active_callbacks += 1
+        try:
+            fn()
+        finally:
+            with self._condition:
+                self._active_callbacks -= 1
+                self._condition.notify_all()
 
 
 class RepoChangeHandler(FileSystemEventHandler):
@@ -272,8 +293,10 @@ def main() -> None:
         log.info("Argusd watcher stopping...")
     finally:
         stop_event.set()
+        observer.unschedule_all()
         observer.stop()
         observer.join()
+        debouncer.close()
 
 
 if __name__ == "__main__":

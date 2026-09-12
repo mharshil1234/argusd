@@ -83,8 +83,10 @@ def test_file_content_invalidation(tmp_path: Path) -> None:
         stale = wait_until_stale(conn, claim_id)
         check("file-content claim flips to stale via watcher alone", stale)
     finally:
+        observer.unschedule_all()
         observer.stop()
         observer.join()
+        debouncer.close()
         conn.close()
 
 
@@ -132,8 +134,10 @@ def test_git_state_invalidation(tmp_path: Path) -> None:
         stale = wait_until_stale(conn, claim_id)
         check("git-state claim flips to stale via watcher alone", stale)
     finally:
+        observer.unschedule_all()
         observer.stop()
         observer.join()
+        debouncer.close()
         conn.close()
 
 
