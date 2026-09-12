@@ -1,0 +1,1 @@
+See CLAUDE.md for the full project brief, architecture, and roadmap.
