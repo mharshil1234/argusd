@@ -67,19 +67,19 @@ and the dashboard updates live over its SSE feed — `trigger_change.py`'s own
 — purely narrative (Argusd hashes `auth.ts` itself; it has no import-graph
 tracking, which is explicitly out of scope). Use `--claim routes` for the
 other file claim, or `--claim env` to flip the seeded `PORT` value in
-`.env`. Argusd's own storage/API never touches or exposes the raw value —
-only hashes — but `--claim env` also re-records an updated belief after
-the flip (agent-authored narrative text, same as the seed claim's own
-"port 3000" text). Recording a fresh claim about a source supersedes and
-removes any prior stale claim about that same source, so the claims list
-always reflects current state; the flip itself is still permanently
-recorded in the dashboard's event log regardless.
+`.env` — never the raw value, only the hash, is ever stored or printed.
+All three claim types behave identically here: the script only flips the
+claim stale and stops. It deliberately does not re-verify or re-record an
+updated belief — that's the live agent's job (see `CLAUDE.md`'s self-audit
+habit), triggered by asking it to continue, not by this script.
 
 The generated workspace is ignored by Git and can be safely recreated with
-`--reset`. Each real invalidation — file, git-state, or `.env` key — is
-retained in the dashboard's durable event log even after its claim is
-superseded; reloading the page does not erase those events, and only the
-latest 20 are displayed.
+`--reset`. Each real invalidation — file, git-state, or `.env` key — is also
+retained in the dashboard's event log; reloading the page does not erase
+those events, and only the latest 20 are displayed. When the agent later
+re-verifies and records an updated claim, that new claim supersedes (and
+removes) the stale one from the live claims list — the event log still
+keeps the permanent record either way.
 
 ## 90-second rehearsal
 
@@ -87,11 +87,10 @@ latest 20 are displayed.
    call the Argusd tools.
 2. Start `server\watcher.py` with the generated database and `.env` paths.
 3. Start the dashboard and show the three fresh claims.
-4. Trigger `auth`, then `env`, and point out the live stale badges and durable
-   event entries. Note `env` also re-records an updated belief, which
-   replaces the stale claim with a fresh one — the full loop, not just the
-   drift, while the event log keeps the permanent record either way. Ask
-   Codex to call `list_stale` before continuing.
+4. Trigger `auth`, then `env` — both just go stale. Ask the agent to
+   continue: it self-audits, re-verifies each source, and records updated
+   claims, which replace the stale ones on the dashboard — the full loop,
+   not just the drift.
 5. Reload the dashboard to prove event history persists.
 
 If live editing or startup is unreliable during review, use

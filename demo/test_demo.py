@@ -81,16 +81,12 @@ class DemoWorkflowTests(unittest.TestCase):
             env_after = (workspace / ".env").read_text(encoding="utf-8")
             self.assertNotEqual(env_after, env_before)
             self.assertIn("PORT=4000", env_after)
-            # The mechanical report lines (Changed/check_freshness/list_stale)
-            # never print the raw value -- only the re-recorded claim's own
-            # agent-authored narrative text may mention it, same precedent
-            # as the seed claim's "port 3000" text.
-            mechanical_lines = "\n".join(
-                line for line in trigger.stdout.splitlines() if "re-recorded" not in line
-            )
-            self.assertNotIn("4000", mechanical_lines)
-            self.assertIn("re-recorded -> claim_id=4 (fresh)", trigger.stdout)
+            self.assertNotIn("4000", trigger.stdout)  # raw value never printed
 
+            # The script only flips the claim stale -- it deliberately does
+            # not re-record an updated belief. That's the live agent's
+            # self-audit habit's job (CLAUDE.md), kept consistent with how
+            # --claim auth/routes already behave (stale and stopped there).
             database = sqlite3.connect(workspace / "argusd.db")
             try:
                 rows = database.execute(
@@ -98,15 +94,11 @@ class DemoWorkflowTests(unittest.TestCase):
                 ).fetchall()
             finally:
                 database.close()
-            # The re-recorded claim (id 4) supersedes and deletes the original
-            # stale env claim (id 3) -- only 3 rows remain: auth (still stale,
-            # untouched by the env trigger), routes (untouched), and the new
-            # fresh env claim. invalidation_events (not claims) is where the
-            # permanent history of the id-3 flip lives.
             self.assertEqual(len(rows), 3)
             self.assertEqual(rows[0][2], "stale")  # auth: unchanged from before
             self.assertEqual(rows[1][2:], ("fresh", None))  # routes: still untouched
-            self.assertEqual(rows[2], (4, ".env:PORT", "fresh", None))  # supersedes id 3
+            self.assertEqual(rows[2][2], "stale")  # env: just flipped, not re-recorded
+            self.assertIsNotNone(rows[2][3])
         finally:
             for _ in range(30):
                 try:
