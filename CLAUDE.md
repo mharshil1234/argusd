@@ -61,8 +61,10 @@ what's still pending — this block only tracks what's actually done so far.
   on a scratch file; the file was then changed outside any agent turn;
   `server/watcher.py` flipped the claim stale with zero agent tokens
   spent; the same session was resumed and its `list_stale()` call
-  surfaced the drift immediately. Hours 28–33 (full run-throughs) and
-  33–36 (rehearsal) are not yet started.
+  surfaced the drift immediately. Hours 28–33 are complete after repeated
+  isolated demo runs; Hours 33–36 is rehearsal-ready with the documented
+  90-second runbook and deterministic scripted fallback. Human timed practice
+  remains a presentation activity.
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 

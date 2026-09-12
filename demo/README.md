@@ -5,6 +5,19 @@ This folder contains the repeatable stale-claim demo: two file-backed claims
 real MCP stdio tools and writes all generated sources, database state, and the
 non-sensitive manifest under `demo/.run/` by default.
 
+## Codex registration
+
+Codex stores MCP servers in user configuration rather than reading the
+repository's `.mcp.json`. From the repository root, run once in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File demo\register_codex.ps1
+codex mcp get argusd
+```
+
+The helper will not create a duplicate registration. Use `-Force` to replace
+an existing `argusd` entry, then start a fresh Codex session.
+
 ## Run the demo
 
 From the repository root, install Python dependencies first:
@@ -60,3 +73,17 @@ The generated workspace is ignored by Git and can be safely recreated with
 `--reset`. Each real invalidation — file, git-state, or `.env` key — is also
 retained in the dashboard's event log; reloading the page does not erase
 those events, and only the latest 20 are displayed.
+
+## 90-second rehearsal
+
+1. Seed the workspace and verify that a fresh Codex session can discover and
+   call the Argusd tools.
+2. Start `server\watcher.py` with the generated database and `.env` paths.
+3. Start the dashboard and show the three fresh claims.
+4. Trigger `auth`, then `env`, and point out the live stale badges and durable
+   event entries. Ask Codex to call `list_stale` before continuing.
+5. Reload the dashboard to prove event history persists.
+
+If live editing or startup is unreliable during review, use
+`trigger_change.py --claim auth` or `--claim env` as the deterministic
+fallback. The narrative `login.ts` does not imply import-graph tracking.

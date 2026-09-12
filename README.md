@@ -4,7 +4,7 @@ Argusd timestamps claims an AI coding agent makes about a codebase and marks
 them stale when their source changes. The repository currently combines the
 Python SQLite/hash foundation with a read-only Next.js claims dashboard.
 
-## Current checkpoint: Hours 14–20
+## Current checkpoint: Hours 33–36 readiness
 
 - `server/db.py` owns the shared SQLite schema and writes runtime data to
   `argusd.db` at the repository root.
@@ -25,6 +25,10 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   `invalidation_events` table; recent events survive page reloads and feed
   reconnects.
 - `demo/` contains a repeatable file-backed stale-claim walkthrough.
+
+Hours 20–28 integration and the Hours 28–33 full run-throughs are complete.
+The remaining Hours 33–36 work is human rehearsal using the documented
+90-second run and deterministic scripted fallback.
 
 Both halves of Hours 14–20 are done: config-key (`.env`) claims and the
 dashboard's invalidation-timeline/event-log UI.
@@ -66,6 +70,17 @@ open Claude Code in this directory, approve the one-time "project requires
 approval to run MCP servers" prompt, and `record_claim`/`check_freshness`/
 `list_stale` are available to the session immediately. The checked-in command
 uses `.venv\\Scripts\\python.exe` on Windows; use `.venv/bin/python` on Unix.
+
+**Codex CLI:** Codex keeps MCP registrations in user configuration. From the
+repository root, register Argusd once in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File demo\register_codex.ps1
+codex mcp get argusd
+```
+
+The helper is idempotent; pass `-Force` only to replace an existing entry.
+Start a fresh Codex session after registration so it discovers the tools.
 
 For an HTTP/SSE client or MCP inspector:
 
@@ -115,9 +130,10 @@ npm.cmd run dev
 
 Without the variable, both processes resolve the repository-root `argusd.db`.
 
-For the repeatable demo, see `demo/README.md`. It uses
-`demo/.run/argusd.db`, records two file-backed claims through MCP, changes one
-generated source, and leaves the dashboard showing the fresh/stale split.
+For the repeatable demo and final rehearsal, see `demo/README.md`. It uses
+`demo/.run/argusd.db`, records file, git-state, and `.env` claims through MCP,
+changes one controlled source at a time, and leaves the dashboard showing the
+fresh/stale split plus the durable event timeline.
 
 ## Verification
 
