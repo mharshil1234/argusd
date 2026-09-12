@@ -61,6 +61,11 @@ Configure that command as a stdio MCP server. Call `record_claim` for a file,
 edit the file, then call `check_freshness`; the second call should report the
 claim as stale. `list_stale` returns the stale claim summary.
 
+**Claude Code:** the repo-root `.mcp.json` registers this server already —
+open Claude Code in this directory, approve the one-time "project requires
+approval to run MCP servers" prompt, and `record_claim`/`check_freshness`/
+`list_stale` are available to the session immediately.
+
 For an HTTP/SSE client or MCP inspector:
 
 ```powershell

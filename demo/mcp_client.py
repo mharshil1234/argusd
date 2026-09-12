@@ -15,13 +15,17 @@ SERVER_DIR = Path(__file__).resolve().parent.parent / "server"
 
 
 @asynccontextmanager
-async def mcp_session(db_path: Path) -> AsyncIterator[ClientSession]:
-    """Yield an MCP session connected to an isolated database."""
+async def mcp_session(db_path: Path, env_path: Path | None = None) -> AsyncIterator[ClientSession]:
+    """Yield an MCP session connected to an isolated database (and, for
+    .env:KEY claims, an isolated .env file via ARGUSD_ENV_PATH)."""
+    env = {**os.environ, "ARGUSD_DB_PATH": str(db_path)}
+    if env_path is not None:
+        env["ARGUSD_ENV_PATH"] = str(env_path)
     params = StdioServerParameters(
         command=os.environ.get("PYTHON", sys.executable),
         args=["main.py"],
         cwd=str(SERVER_DIR),
-        env={**os.environ, "ARGUSD_DB_PATH": str(db_path)},
+        env=env,
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

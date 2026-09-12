@@ -37,7 +37,8 @@ class DemoWorkflowTests(unittest.TestCase):
             self.assertEqual(seed.returncode, 0, seed.stderr)
 
             manifest = json.loads((workspace / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(set(manifest["claims"]), {"auth", "routes"})
+            self.assertEqual(set(manifest["claims"]), {"auth", "routes", "env"})
+            self.assertEqual(manifest["claims"]["env"]["source"], ".env:PORT")
             self.assertNotIn("source_hash", json.dumps(manifest))
 
             database = sqlite3.connect(workspace / "argusd.db")
@@ -45,7 +46,7 @@ class DemoWorkflowTests(unittest.TestCase):
                 rows = database.execute("SELECT status FROM claims ORDER BY id").fetchall()
             finally:
                 database.close()
-            self.assertEqual(rows, [("fresh",), ("fresh",)])
+            self.assertEqual(rows, [("fresh",), ("fresh",), ("fresh",)])
 
             duplicate = self.run_script(SEED, "--workspace", str(workspace))
             self.assertNotEqual(duplicate.returncode, 0)
@@ -58,6 +59,10 @@ class DemoWorkflowTests(unittest.TestCase):
             self.assertIn("check_freshness -> stale", trigger.stdout)
             self.assertEqual((workspace / "routes.ts").read_bytes(), routes_before)
             self.assertNotEqual((workspace / "auth.ts").read_bytes(), auth_before)
+            self.assertIn(
+                'import { source } from "./auth.ts";',
+                (workspace / "login.ts").read_text(encoding="utf-8"),
+            )
 
             database = sqlite3.connect(workspace / "argusd.db")
             try:
@@ -67,6 +72,26 @@ class DemoWorkflowTests(unittest.TestCase):
             self.assertEqual(rows[0][0], "stale")
             self.assertIsNotNone(rows[0][1])
             self.assertEqual(rows[1], ("fresh", None))
+            self.assertEqual(rows[2], ("fresh", None))
+
+            env_before = (workspace / ".env").read_text(encoding="utf-8")
+            trigger = self.run_script(TRIGGER, "--workspace", str(workspace), "--claim", "env")
+            self.assertEqual(trigger.returncode, 0, trigger.stderr)
+            self.assertIn("check_freshness -> stale", trigger.stdout)
+            env_after = (workspace / ".env").read_text(encoding="utf-8")
+            self.assertNotEqual(env_after, env_before)
+            self.assertIn("PORT=4000", env_after)
+            self.assertNotIn("4000", trigger.stdout)  # raw value never printed
+
+            database = sqlite3.connect(workspace / "argusd.db")
+            try:
+                rows = database.execute("SELECT status, stale_at FROM claims ORDER BY id").fetchall()
+            finally:
+                database.close()
+            self.assertEqual(rows[0][0], "stale")  # auth: unchanged from before
+            self.assertEqual(rows[1], ("fresh", None))  # routes: still untouched
+            self.assertEqual(rows[2][0], "stale")  # env: just flipped
+            self.assertIsNotNone(rows[2][1])
         finally:
             for _ in range(30):
                 try:
