@@ -1,22 +1,20 @@
 # Argusd MCP server
 
-Exposes the three real tools from CLAUDE.md, wired to SQLite:
+Exposes the three real tools from `CLAUDE.md`, wired to SQLite:
 
-- `record_claim(text, source_key) -> claim_id` — hashes the source now,
-  stores the claim as fresh.
-- `check_freshness(claim_id) -> {status, changed_at?}` — rehashes the
-  source, flips the claim stale if it changed, returns the verdict.
-- `list_stale() -> [{claim_id, text, source_key, stale_at}]` — every
-  currently-stale claim.
+- `record_claim(text, source_key) -> claim_id` hashes the source and stores a
+  fresh claim.
+- `check_freshness(claim_id) -> {status, changed_at?}` rehashes its source and
+  marks the claim stale when it changed.
+- `list_stale() -> [{claim_id, text, source_key, stale_at}]` returns all stale
+  claims.
 
-Claims persist in `server/argusd.db` (gitignored) so they survive across
-tool calls within a session. `source_key` is a file path for now; `git:`
-and `.env:KEY` prefixes are recognized but raise `NotImplementedError`
-until the watcher and env-parser phases land.
+File source keys are supported now. `git:` and `.env:KEY` source keys are
+reserved for the watcher and config-parser phases.
 
 ## Setup
 
-Use Python 3.10+ in a virtual environment, then install:
+Use Python 3.10+ in a virtual environment from the repository root:
 
 ```powershell
 python -m venv .venv
@@ -32,20 +30,32 @@ Stdio is the primary agent transport:
 python server\main.py
 ```
 
-For HTTP/SSE debugging, run:
+For HTTP/SSE debugging:
 
 ```powershell
 python server\main.py --transport sse
 ```
 
-The MCP framework serves its SSE endpoint using its default local host/port.
-Use an MCP client inspector or the agent's MCP configuration to connect.
+The MCP framework prints its local SSE endpoint at startup. Connect an MCP
+inspector or compatible client there.
 
-## Test client
+## Verify
 
-`test_mcp_client.py` spawns the server over stdio and calls all three
-tools directly (no agent required) to verify behavior in isolation:
+The integration client starts the server over stdio and calls all three tools:
 
+```powershell
+python server\test_mcp_client.py
 ```
-python server/test_mcp_client.py
+
+The hash-change proof can also be run independently:
+
+```powershell
+python server\test_hash_change.py
 ```
+
+## Shared database
+
+The authoritative `server/db.py` default is `argusd.db` at the repository
+root. The MCP server initializes that schema; the dashboard opens the same
+file read-only and never initializes or migrates it. The database is generated
+runtime state and ignored by Git.
