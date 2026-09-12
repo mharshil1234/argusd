@@ -65,11 +65,29 @@ Configure that command as a stdio MCP server. Call `record_claim` for a file,
 edit the file, then call `check_freshness`; the second call should report the
 claim as stale. `list_stale` returns the stale claim summary.
 
-**Claude Code:** the repo-root `.mcp.json` registers this server already —
-open Claude Code in this directory, approve the one-time "project requires
-approval to run MCP servers" prompt, and `record_claim`/`check_freshness`/
-`list_stale` are available to the session immediately. The checked-in command
-uses `.venv\\Scripts\\python.exe` on Windows; use `.venv/bin/python` on Unix.
+**Claude Code:** the repo-root `.mcp.json` registers this server as a
+project-scoped default, but its `command` is a single hardcoded interpreter
+path — whichever OS committed it last, the other OS gets an immediate
+`ENOENT`/`CONNECTION_CLOSED` (verified: a Windows path there breaks Linux
+outright, and vice versa). Don't fight over which path is committed — each
+developer instead registers a **local-scope** override once, which lives in
+their own `~/.claude.json` and is never committed, and takes precedence over
+the project entry with the same name:
+
+```bash
+# Linux/Mac
+claude mcp add --scope local argusd -- "$(pwd)/.venv/bin/python" "$(pwd)/server/main.py"
+```
+
+```powershell
+# Windows
+claude mcp add --scope local argusd -- "$PWD\.venv\Scripts\python.exe" "$PWD\server\main.py"
+```
+
+After that, opening Claude Code in this directory (approving the one-time
+"project requires approval to run MCP servers" prompt) gives the session
+`record_claim`/`check_freshness`/`list_stale` regardless of what's committed
+in `.mcp.json`. Verified end-to-end with real `claude -p` sessions on Linux.
 
 **Codex CLI:** Codex keeps MCP registrations in user configuration. From the
 repository root, register Argusd once in PowerShell:

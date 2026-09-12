@@ -65,6 +65,16 @@ what's still pending — this block only tracks what's actually done so far.
   isolated demo runs; Hours 33–36 is rehearsal-ready with the documented
   90-second runbook and deterministic scripted fallback. Human timed practice
   remains a presentation activity.
+- **Correction (post-merge):** the teammate's fix for the Hours 20–28
+  `CONNECTION_CLOSED` bug swapped `.mcp.json`'s `command` to the Windows
+  venv path, which broke it outright on Linux (verified: `ENOENT`). A
+  single committed path can't serve both platforms. Fixed properly via
+  Claude Code's local-scope override (`claude mcp add --scope local argusd
+  -- <path-to-venv-python> server/main.py`, once per developer, written to
+  `~/.claude.json`, never committed) — see root `README.md`. Re-verified
+  live on Linux after the fix. The "Hours 28–33 complete"/"Hours 33–36
+  rehearsal-ready" claims above are the teammate's own report from their
+  (Windows/Codex) side; not independently re-verified from this session.
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 
