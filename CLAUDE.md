@@ -8,6 +8,35 @@ parallel — task ownership is marked below as **[A]** or **[B]**. There is a
 **Review 1 checkpoint at the 3-hour mark**, so prioritize getting that
 milestone working and demonstrable over anything later in the roadmap.
 
+## Status (updated as phases complete)
+
+The sections below are the original roadmap and remain the reference for
+what's still pending — this block only tracks what's actually done so far.
+
+- **Hours 0–3 (Review 1) — done.** `server/db.py` (claims/sources schema)
+  and `server/hashing.py` (file hashing) proven via `server/test_hash_change.py`.
+- **Hours 3–8 — done.** `record_claim`, `check_freshness`, `list_stale`
+  implemented for real in `server/main.py` against a shared `argusd.db` at
+  the repo root; verified end-to-end over the real MCP protocol by
+  `server/test_mcp_client.py`. The dashboard reads that same file (`[B]`).
+- **Hours 8–14 — done.** `server/watcher.py` watches the repo tree and
+  `.git` directly and flips dependent claims stale the instant a source
+  changes, with no agent call involved; `hash_git_state()` is implemented
+  for real. Proven by `server/test_watcher.py` and by a live run (edit a
+  file, watcher logs `[STALE] ...` and the DB flips with zero MCP calls).
+  The dashboard replaced polling with a live `GET /api/events`
+  Server-Sent-Events feed (`[B]`).
+- **Demo tooling — done ahead of schedule.** `demo/seed_claims.py`,
+  `demo/trigger_change.py`, and `demo/mcp_client.py` implement the
+  repeatable file-backed stale-claim walkthrough over the real MCP stdio
+  tools, proven by `demo/test_demo.py`; originally scheduled for Hours
+  20–28 but landed early (`[B]`).
+- **Not yet started:** `.env`/config-key claims (Hours 14–20), the
+  dashboard's invalidation-timeline/event-log UI polish (Hours 14–20), and
+  full Claude Code agent integration (Hours 20–28+).
+
+See `README.md` and `server/README.md` for exact run/verify commands.
+
 ## The problem
 
 AI coding agents build a mental model of a codebase as they work — "this

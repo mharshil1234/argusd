@@ -9,8 +9,8 @@ Exposes the three real tools from `CLAUDE.md`, wired to SQLite:
 - `list_stale() -> [{claim_id, text, source_key, stale_at}]` returns all stale
   claims.
 
-File source keys are supported now. `git:` and `.env:KEY` source keys are
-reserved for the watcher and config-parser phases.
+File and `git:` source keys are supported now. `.env:KEY` source keys are
+reserved for the config-parser phase.
 
 ## Setup
 
@@ -39,6 +39,23 @@ python server\main.py --transport sse
 The MCP framework prints its local SSE endpoint at startup. Connect an MCP
 inspector or compatible client there.
 
+## Watcher
+
+The watcher is a separate, always-on process independent of the MCP
+server's lifecycle — it invalidates claims the instant a source changes,
+with no agent call involved. Run it in a second terminal, from the
+repository root, and leave it running for the duration of a session:
+
+```powershell
+python server\watcher.py
+```
+
+Ctrl+C stops it. It watches the whole repo tree for file edits and `.git`
+for commit/branch/index changes, flips dependent claims stale, and logs
+every invalidation to stdout as `[STALE] <source_key> changed at <ts> ->
+invalidated claim ids [...]`. Set `ARGUSD_DB_PATH` the same way as for
+`main.py` if you're pointing at a non-default database.
+
 ## Verify
 
 The integration client starts the server over stdio and calls all three tools:
@@ -51,6 +68,13 @@ The hash-change proof can also be run independently:
 
 ```powershell
 python server\test_hash_change.py
+```
+
+The watcher's file-content and git-state invalidation paths are proven the
+same way, against disposable scratch trees:
+
+```powershell
+python server\test_watcher.py
 ```
 
 ## Shared database

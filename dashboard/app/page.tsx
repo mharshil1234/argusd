@@ -23,44 +23,48 @@ function ClaimRow({ claim }: { claim: DashboardClaim }) {
   );
 }
 
+type FeedState = "connecting" | "open" | "error";
+
 export default function Home() {
   const [data, setData] = useState<ClaimsResponse>(initialResponse);
   const [loading, setLoading] = useState(true);
+  const [feedState, setFeedState] = useState<FeedState>("connecting");
 
   useEffect(() => {
     let active = true;
-    let inFlight = false;
-    let controller: AbortController | undefined;
-    async function refresh() {
-      if (inFlight) return;
-      inFlight = true;
-      controller = new AbortController();
+    const source = new EventSource("/api/events");
+
+    source.onopen = () => {
+      if (active) setFeedState("open");
+    };
+    source.onmessage = (event) => {
+      if (!active) return;
       try {
-        const response = await fetch("/api/claims", { cache: "no-store", signal: controller.signal });
-        if (!response.ok) throw new Error(`Dashboard API returned ${response.status}`);
-        const nextData = (await response.json()) as ClaimsResponse;
-        if (active) setData(nextData);
-      } catch (error) {
-        if (active && !(error instanceof DOMException && error.name === "AbortError")) {
-          setData({ state: "error", claims: [], summary: { total: 0, fresh: 0, stale: 0 }, generatedAt: new Date().toISOString(), message: error instanceof Error ? error.message : "Unable to refresh claims." });
-        }
-      } finally {
-        inFlight = false;
-        if (active) setLoading(false);
+        setData(JSON.parse(event.data) as ClaimsResponse);
+        setLoading(false);
+        setFeedState("open");
+      } catch {
+        // malformed frame; ignore, the next message will recover
       }
-    }
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 1_000);
-    return () => { active = false; window.clearInterval(timer); controller?.abort(); };
+    };
+    source.onerror = () => {
+      // EventSource retries on its own; onopen fires again once it reconnects.
+      if (active) setFeedState("error");
+    };
+
+    return () => {
+      active = false;
+      source.close();
+    };
   }, []);
 
-  const connectionLabel = loading ? "Connecting" : data.state === "error" ? "Read error" : data.state === "waiting" ? "Waiting for DB" : "SQLite connected";
+  const connectionLabel = loading ? "Connecting" : feedState === "error" ? "Reconnecting…" : data.state === "error" ? "Read error" : data.state === "waiting" ? "Waiting for DB" : "Live";
 
   return (
     <main className="dashboard-shell">
       <header className="dashboard-header">
         <div><p className="eyebrow">ARGUSD / LIVE FRESHNESS MONITOR</p><h1>Claims dashboard</h1><p className="lede">See which agent beliefs still match their underlying source.</p></div>
-        <div className={`connection connection-${data.state}`} aria-live="polite"><span className="connection-dot" aria-hidden="true" /><div><strong>{connectionLabel}</strong><span>{data.generatedAt ? `Last checked ${formatTimestamp(data.generatedAt)}` : "Starting poller"}</span></div></div>
+        <div className={`connection connection-${data.state}`} aria-live="polite"><span className="connection-dot" aria-hidden="true" /><div><strong>{connectionLabel}</strong><span>{data.generatedAt ? `Updated ${formatTimestamp(data.generatedAt)}` : "Connecting to live feed"}</span></div></div>
       </header>
 
       <section className="summary-grid" aria-label="Claim freshness summary">
@@ -70,14 +74,14 @@ export default function Home() {
       </section>
 
       <section className="claims-panel" aria-labelledby="claims-heading" aria-busy={loading}>
-        <div className="panel-header"><div><p className="section-kicker">READ-ONLY SQLITE VIEW</p><h2 id="claims-heading">Tracked claims</h2></div><div className="panel-meta"><span>{data.summary.total} total</span><span className="poll-rate">POLLING · 1s</span></div></div>
+        <div className="panel-header"><div><p className="section-kicker">READ-ONLY SQLITE VIEW</p><h2 id="claims-heading">Tracked claims</h2></div><div className="panel-meta"><span>{data.summary.total} total</span><span className="poll-rate">{feedState === "open" ? "LIVE" : feedState === "error" ? "RECONNECTING" : "CONNECTING"}</span></div></div>
         {loading ? <div className="state-card" role="status"><span className="spinner" />Reading claims…</div>
           : data.state !== "ready" ? <div className={`state-card state-${data.state}`} role="status" aria-live="polite"><strong>{data.state === "waiting" ? "Argusd is ready for data" : "Claims are temporarily unavailable"}</strong><p>{data.message}</p>{data.state === "waiting" && <code>python -c &quot;from server.db import connect, init_db; c=connect(); init_db(c)&quot;</code>}</div>
           : data.claims.length === 0 ? <div className="state-card" role="status"><strong>No claims recorded yet</strong><p>Call the MCP record_claim tool to populate this view.</p></div>
           : <div className="claims-list">{data.claims.map((claim) => <ClaimRow key={claim.id} claim={claim} />)}</div>}
       </section>
 
-      <footer><span>Hashes and raw config values never leave the server.</span><span>WebSocket events arrive in Hours 8–14.</span></footer>
+      <footer><span>Hashes and raw config values never leave the server.</span><span>Live updates via Server-Sent Events.</span></footer>
     </main>
   );
 }
