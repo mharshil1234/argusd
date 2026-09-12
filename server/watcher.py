@@ -102,6 +102,7 @@ def invalidate_file_source(source_key: str, repo_root: Path) -> None:
         if new_hash is not None:
             db.upsert_source(conn, source_key, new_hash)
         if ids:
+            db.insert_invalidation_event(conn, source_key, len(ids))
             log.info(
                 "[STALE] %s changed at %s -> invalidated claim ids %s",
                 source_key,
@@ -128,6 +129,7 @@ def invalidate_git_source(repo_root: Path) -> None:
         ids = db.mark_source_claims_stale(conn, GIT_SOURCE_KEY)
         db.upsert_source(conn, GIT_SOURCE_KEY, new_hash)
         if ids:
+            db.insert_invalidation_event(conn, GIT_SOURCE_KEY, len(ids))
             log.info(
                 "[STALE] %s changed at %s -> invalidated claim ids %s",
                 GIT_SOURCE_KEY,

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from watchdog.observers import Observer
 
-from db import connect, init_db, insert_claim, get_claim
+from db import connect, init_db, insert_claim, get_claim, list_invalidation_events
 from hashing import hash_file, hash_git_state
 from watcher import Debouncer, RepoChangeHandler, GitFileHandler, GIT_SOURCE_KEY
 
@@ -82,6 +82,10 @@ def test_file_content_invalidation(tmp_path: Path) -> None:
 
         stale = wait_until_stale(conn, claim_id)
         check("file-content claim flips to stale via watcher alone", stale)
+        events = list_invalidation_events(conn)
+        check("file invalidation event records the affected claim count", len(events) == 1 and events[0]["source_key"] == source_key and events[0]["invalidated_count"] == 1)
+        time.sleep(0.15)
+        check("repeated filesystem notifications do not duplicate the event", len(list_invalidation_events(conn)) == 1)
     finally:
         observer.unschedule_all()
         observer.stop()
@@ -133,6 +137,8 @@ def test_git_state_invalidation(tmp_path: Path) -> None:
 
         stale = wait_until_stale(conn, claim_id)
         check("git-state claim flips to stale via watcher alone", stale)
+        events = list_invalidation_events(conn)
+        check("git invalidation event records the affected claim count", len(events) == 1 and events[0]["source_key"] == GIT_SOURCE_KEY and events[0]["invalidated_count"] == 1)
     finally:
         observer.unschedule_all()
         observer.stop()

@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS sources (
     last_hash TEXT NOT NULL,
     last_checked TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS invalidation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_key TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    invalidated_count INTEGER NOT NULL CHECK (invalidated_count > 0)
+);
 """
 
 
@@ -118,4 +125,37 @@ def mark_source_claims_stale(conn: sqlite3.Connection, source_key: str) -> list[
 def list_stale_claims(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT id AS claim_id, text, source_key, stale_at FROM claims WHERE status = 'stale'"
+    ).fetchall()
+
+
+def insert_invalidation_event(
+    conn: sqlite3.Connection, source_key: str, invalidated_count: int
+) -> int:
+    """Record one real fresh-to-stale transition for dashboard history."""
+    if invalidated_count <= 0:
+        raise ValueError("invalidated_count must be positive")
+    cur = conn.execute(
+        """
+        INSERT INTO invalidation_events (source_key, occurred_at, invalidated_count)
+        VALUES (?, ?, ?)
+        """,
+        (source_key, now_iso(), invalidated_count),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_invalidation_events(
+    conn: sqlite3.Connection, limit: int = 20
+) -> list[sqlite3.Row]:
+    """Return recent invalidations newest-first, capped to a safe positive limit."""
+    bounded_limit = max(1, min(limit, 100))
+    return conn.execute(
+        """
+        SELECT id, source_key, occurred_at, invalidated_count
+        FROM invalidation_events
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT ?
+        """,
+        (bounded_limit,),
     ).fetchall()
