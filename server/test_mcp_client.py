@@ -11,6 +11,7 @@ Run: python server/test_mcp_client.py
 
 import asyncio
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -48,11 +49,15 @@ def unwrap(result) -> object:
 
 async def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        scratch_file = Path(tmp) / "auth.ts"
+        tmp_path = Path(tmp)
+        scratch_file = tmp_path / "auth.ts"
         scratch_file.write_text("export function login() { return true; }\n")
 
         params = StdioServerParameters(
-            command=sys.executable, args=["main.py"], cwd=str(SERVER_DIR)
+            command=sys.executable,
+            args=["main.py"],
+            cwd=str(SERVER_DIR),
+            env={**os.environ, "ARGUSD_DB_PATH": str(tmp_path / "argusd.db")},
         )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:

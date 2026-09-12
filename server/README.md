@@ -57,5 +57,6 @@ python server\test_hash_change.py
 
 The authoritative `server/db.py` default is `argusd.db` at the repository
 root. The MCP server initializes that schema; the dashboard opens the same
-file read-only and never initializes or migrates it. The database is generated
-runtime state and ignored by Git.
+file read-only and never initializes or migrates it. Set `ARGUSD_DB_PATH` to
+an absolute path to override the location for both processes. The database is
+generated runtime state and ignored by Git.

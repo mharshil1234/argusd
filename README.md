@@ -61,11 +61,11 @@ Connect the client to the FastMCP SSE endpoint printed at startup. See
 
 ## 3. Run the dashboard
 
-In a second terminal:
+Use Node.js 20.9 or newer. In a second terminal:
 
 ```powershell
 cd dashboard
-npm.cmd install
+npm.cmd ci
 npm.cmd run dev
 ```
 
@@ -74,15 +74,15 @@ state until the root database and schema exist, then displays claims newest
 first with fresh/stale counts. It only exposes claim ID, text, source key,
 timestamps, and freshness status; source hashes never enter the API response.
 
-The database path can be overridden for both testing and alternate checkouts:
+The database path can be overridden for both the MCP server and dashboard,
+which is useful for testing and alternate checkouts:
 
 ```powershell
 $env:ARGUSD_DB_PATH = "C:\absolute\path\to\argusd.db"
 npm.cmd run dev
 ```
 
-Without the variable, starting Next.js from `dashboard/` resolves
-`../argusd.db`, matching `server/db.py`.
+Without the variable, both processes resolve the repository-root `argusd.db`.
 
 ## Verification
 
@@ -99,7 +99,7 @@ newest-first ordering, nullable `stale_at`, and that hashes are absent from
 the response. The reader opens SQLite read-only and never initializes or
 migrates the database.
 
-On the current development host, Node.js 25.6.1 and npm 11.9.0 are available.
-Python and the Windows `py` launcher are not installed, so the Python hash
-test, schema initialization, and MCP runtime checks must be run on a host with
-Python 3.10+ before the combined demo is signed off.
+The verified development host used Node.js 25.6.1, npm 11.9.0, and Python
+3.12.14. The hash-change proof and stdio MCP integration client both pass;
+the SSE transport also starts successfully and serves its event-stream
+handshake on `/sse`.

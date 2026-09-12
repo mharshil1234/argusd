@@ -7,6 +7,8 @@ timestamp, never file contents) to minimize per-turn token overhead.
 """
 
 import argparse
+import os
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
@@ -17,7 +19,8 @@ mcp = FastMCP("argusd")
 
 
 def _get_conn():
-    conn = db.connect()
+    db_path = Path(os.environ.get("ARGUSD_DB_PATH", db.DEFAULT_DB_PATH))
+    conn = db.connect(db_path)
     db.init_db(conn)
     return conn
 
