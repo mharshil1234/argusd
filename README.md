@@ -13,10 +13,11 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   over stdio or SSE/HTTP.
 - `dashboard/` reads that same database without creating or migrating it,
   exposes `GET /api/claims`, and polls the endpoint every second.
-- `demo/` remains placeholder tooling until the integration phase.
+- `demo/` contains a repeatable file-backed stale-claim walkthrough.
 
-WebSockets, watcher events, and the invalidation timeline belong to Hours
-8–14 and are intentionally not part of this checkpoint.
+WebSockets, watcher events, `.env`/git source types, and the invalidation
+timeline belong to later roadmap phases and are intentionally not part of
+this demo.
 
 ## 1. Set up Python and initialize SQLite
 
@@ -83,6 +84,10 @@ npm.cmd run dev
 ```
 
 Without the variable, both processes resolve the repository-root `argusd.db`.
+
+For the repeatable demo, see `demo/README.md`. It uses
+`demo/.run/argusd.db`, records two file-backed claims through MCP, changes one
+generated source, and leaves the dashboard showing the fresh/stale split.
 
 ## Verification
 

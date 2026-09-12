@@ -1,12 +1,44 @@
 # Demo tooling
 
-This folder is reserved for the scripted Review 1 / end-to-end demo.
+This folder contains the repeatable file-backed stale-claim demo. It uses the
+real MCP stdio tools and writes all generated sources, database state, and the
+non-sensitive manifest under `demo/.run/` by default.
 
-The scripts are intentionally placeholders in Hour 0–3. Once Person A’s
-claim tools and SQLite schema are available:
+## Run the demo
 
-- `seed_claims.py` will record representative claims.
-- `trigger_change.py` will make a controlled source change that invalidates
-  those claims.
+From the repository root, install Python dependencies first:
 
-No source files or claim data are modified by the current placeholders.
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r server\requirements.txt
+```
+
+In terminal one, seed the isolated workspace:
+
+```powershell
+python demo\seed_claims.py --reset
+```
+
+In terminal two, point the dashboard at the generated database and start it:
+
+```powershell
+$env:ARGUSD_DB_PATH = (Resolve-Path demo\.run\argusd.db).Path
+cd dashboard
+npm.cmd run dev
+```
+
+Open `http://localhost:3000`. Two fresh claims should appear after the first
+poll. In terminal one, trigger a controlled source edit:
+
+```powershell
+python demo\trigger_change.py --claim auth
+```
+
+Within one second, the dashboard should show one stale claim and one fresh
+claim. The command also calls `check_freshness` and `list_stale` and prints
+their results. Use `--claim routes` to run the same flow for the other claim.
+
+The scripts support file-backed claims only. `.env` key claims, git-state
+claims, filesystem watchers, and WebSocket events remain later roadmap work.
+The generated workspace is ignored by Git and can be safely recreated with
+`--reset`.
