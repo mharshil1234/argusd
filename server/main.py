@@ -1,26 +1,23 @@
 """Argusd MCP server: record_claim, check_freshness, list_stale.
 
-Wired to db.py against a persistent SQLite file (server/argusd.db) so
+Wired to db.py against the repository-root SQLite file (argusd.db) so
 claims survive across tool calls within a session. Tool descriptions
 and return values are kept terse by design (a status word and a
 timestamp, never file contents) to minimize per-turn token overhead.
 """
 
 import argparse
-from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
 import db
 from hashing import hash_source
 
-DB_PATH = Path(__file__).resolve().parent / "argusd.db"
-
 mcp = FastMCP("argusd")
 
 
 def _get_conn():
-    conn = db.connect(DB_PATH)
+    conn = db.connect()
     db.init_db(conn)
     return conn
 
