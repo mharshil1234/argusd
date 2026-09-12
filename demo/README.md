@@ -70,13 +70,16 @@ other file claim, or `--claim env` to flip the seeded `PORT` value in
 `.env`. Argusd's own storage/API never touches or exposes the raw value —
 only hashes — but `--claim env` also re-records an updated belief after
 the flip (agent-authored narrative text, same as the seed claim's own
-"port 3000" text), which shows up as a second, fresh `.env:PORT` claim
-right next to the now-stale original: drift caught, then re-verified.
+"port 3000" text). Recording a fresh claim about a source supersedes and
+removes any prior stale claim about that same source, so the claims list
+always reflects current state; the flip itself is still permanently
+recorded in the dashboard's event log regardless.
 
 The generated workspace is ignored by Git and can be safely recreated with
-`--reset`. Each real invalidation — file, git-state, or `.env` key — is also
-retained in the dashboard's event log; reloading the page does not erase
-those events, and only the latest 20 are displayed.
+`--reset`. Each real invalidation — file, git-state, or `.env` key — is
+retained in the dashboard's durable event log even after its claim is
+superseded; reloading the page does not erase those events, and only the
+latest 20 are displayed.
 
 ## 90-second rehearsal
 
@@ -86,8 +89,9 @@ those events, and only the latest 20 are displayed.
 3. Start the dashboard and show the three fresh claims.
 4. Trigger `auth`, then `env`, and point out the live stale badges and durable
    event entries. Note `env` also re-records an updated belief, which
-   appears fresh right next to the stale original — the full loop, not
-   just the drift. Ask Codex to call `list_stale` before continuing.
+   replaces the stale claim with a fresh one — the full loop, not just the
+   drift, while the event log keeps the permanent record either way. Ask
+   Codex to call `list_stale` before continuing.
 5. Reload the dashboard to prove event history persists.
 
 If live editing or startup is unreliable during review, use

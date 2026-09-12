@@ -94,16 +94,19 @@ class DemoWorkflowTests(unittest.TestCase):
             database = sqlite3.connect(workspace / "argusd.db")
             try:
                 rows = database.execute(
-                    "SELECT source_key, status, stale_at FROM claims ORDER BY id"
+                    "SELECT id, source_key, status, stale_at FROM claims ORDER BY id"
                 ).fetchall()
             finally:
                 database.close()
-            self.assertEqual(len(rows), 4)  # the new re-recorded claim adds a 4th row
-            self.assertEqual(rows[0][1], "stale")  # auth: unchanged from before
-            self.assertEqual(rows[1][1:], ("fresh", None))  # routes: still untouched
-            self.assertEqual(rows[2][1], "stale")  # original env claim: just flipped
-            self.assertIsNotNone(rows[2][2])
-            self.assertEqual(rows[3], (".env:PORT", "fresh", None))  # re-verified belief
+            # The re-recorded claim (id 4) supersedes and deletes the original
+            # stale env claim (id 3) -- only 3 rows remain: auth (still stale,
+            # untouched by the env trigger), routes (untouched), and the new
+            # fresh env claim. invalidation_events (not claims) is where the
+            # permanent history of the id-3 flip lives.
+            self.assertEqual(len(rows), 3)
+            self.assertEqual(rows[0][2], "stale")  # auth: unchanged from before
+            self.assertEqual(rows[1][2:], ("fresh", None))  # routes: still untouched
+            self.assertEqual(rows[2], (4, ".env:PORT", "fresh", None))  # supersedes id 3
         finally:
             for _ in range(30):
                 try:

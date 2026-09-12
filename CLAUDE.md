@@ -11,8 +11,11 @@ step, automatically, without being asked: read the actual current content
 of that specific claim's source (the one file, or the one `.env` key it
 names — nothing else) and call `record_claim` with updated text reflecting
 what's true now. Then briefly report what was found stale and what was
-just re-recorded. The old stale claim is never deleted or un-staled —
-recording a new one is how the belief gets updated.
+just re-recorded. `record_claim` automatically supersedes — and removes —
+any prior stale claim about that exact same source, so the live claims
+list only ever shows current state; the permanent record of every
+invalidation that ever happened still lives in `invalidation_events`
+regardless. Don't claim the old stale entry "remains" — it's gone.
 
 **This habit is scoped to exactly that — checking and refreshing claims —
 and nothing else.** Do not run scripts (`seed_claims.py`, `trigger_change.py`,

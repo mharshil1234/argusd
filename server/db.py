@@ -93,8 +93,26 @@ def insert_claim(
         (text, source_key, source_hash, now_iso()),
     )
     conn.commit()
+    new_id = cur.lastrowid
     upsert_source(conn, source_key, source_hash)
-    return cur.lastrowid
+    supersede_stale_claims(conn, source_key, keep_id=new_id)
+    return new_id
+
+
+def supersede_stale_claims(conn: sqlite3.Connection, source_key: str, keep_id: int) -> list[int]:
+    """A fresh claim replaces any stale claims about the same source -- the
+    stale belief is moot once a current one exists (invalidation_events
+    keeps the permanent history; this only trims the live claims list).
+    Returns the removed claim ids."""
+    rows = conn.execute(
+        "SELECT id FROM claims WHERE source_key = ? AND status = 'stale' AND id != ?",
+        (source_key, keep_id),
+    ).fetchall()
+    ids = [row["id"] for row in rows]
+    if ids:
+        conn.executemany("DELETE FROM claims WHERE id = ?", [(i,) for i in ids])
+        conn.commit()
+    return ids
 
 
 def get_claim(conn: sqlite3.Connection, claim_id: int) -> sqlite3.Row | None:
