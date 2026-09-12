@@ -9,8 +9,9 @@ Exposes the three real tools from `CLAUDE.md`, wired to SQLite:
 - `list_stale() -> [{claim_id, text, source_key, stale_at}]` returns all stale
   claims.
 
-File and `git:` source keys are supported now. `.env:KEY` source keys are
-reserved for the config-parser phase.
+File, `git:`, and `.env:KEY` source keys are all supported now. `.env:KEY`
+hashes only that key's value (see `parsers/env.py`) — never the whole
+file, and never the raw value.
 
 ## Setup
 
@@ -50,11 +51,14 @@ repository root, and leave it running for the duration of a session:
 python server\watcher.py
 ```
 
-Ctrl+C stops it. It watches the whole repo tree for file edits and `.git`
-for commit/branch/index changes, flips dependent claims stale, and logs
-every invalidation to stdout as `[STALE] <source_key> changed at <ts> ->
+Ctrl+C stops it. It watches the whole repo tree for file edits, `.git`
+for commit/branch/index changes, and `.env` for per-key value changes —
+diffing old vs. new key hashes so only the changed key's claims go stale,
+never the whole file's. It flips dependent claims stale and logs every
+invalidation to stdout as `[STALE] <source_key> changed at <ts> ->
 invalidated claim ids [...]`. Set `ARGUSD_DB_PATH` the same way as for
-`main.py` if you're pointing at a non-default database.
+`main.py` if you're pointing at a non-default database, and
+`ARGUSD_ENV_PATH` to point at a non-default `.env` file.
 
 Each real fresh-to-stale transition is also recorded in the additive
 `invalidation_events` table. The dashboard reads the latest 20 events
@@ -79,6 +83,13 @@ same way, against disposable scratch trees:
 
 ```powershell
 python server\test_watcher.py
+```
+
+The `.env` per-key parsing, hashing, and diff-only-the-changed-key
+invalidation are proven independently:
+
+```powershell
+python server\test_env_parser.py
 ```
 
 ## Shared database

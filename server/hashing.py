@@ -1,7 +1,7 @@
 """Hash functions for the sources Argusd watches.
 
-Build priority per CLAUDE.md: file content and git state are implemented
-here; per-key config hashing is stubbed until the Hours 14-20 phase.
+Hashes file content, git state, and individual .env keys (see
+parsers/env.py for the per-key .env parsing).
 """
 
 import hashlib
@@ -46,13 +46,19 @@ def hash_source(source_key: str) -> str:
     """Dispatch a source_key to the right hasher and return its current hash.
 
     "git:..." -> git state.
-    ".env:KEY" -> env value (not yet implemented, hour 14-20).
+    ".env:KEY" -> env value.
     anything else -> treated as a file path.
     """
     if source_key.startswith("git:"):
         return hash_git_state(REPO_ROOT)
     if source_key.startswith(".env:"):
-        raise NotImplementedError("env-key hashing lands in the config-parsing phase")
+        from parsers.env import ENV_SOURCE_PREFIX, parse_env_hashes, resolve_env_path
+
+        key = source_key[len(ENV_SOURCE_PREFIX):]
+        hashes = parse_env_hashes(resolve_env_path())
+        if key not in hashes:
+            raise KeyError(f"no such .env key: {key}")
+        return hashes[key]
     path = Path(source_key)
     if not path.is_absolute():
         path = REPO_ROOT / path

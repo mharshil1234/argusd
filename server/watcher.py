@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Passive filesystem + git watcher.
+"""Passive filesystem + git + .env watcher.
 
 Runs independently of the MCP server and any agent call. Watches the repo
-tree for file edits and the .git directory for commit/branch/index
-changes, rehashes affected sources, and flips dependent claims stale the
-instant a source's hash changes -- zero agent tokens spent.
+tree for file edits, the .git directory for commit/branch/index changes,
+and the .env file for per-key value changes, rehashes affected sources,
+and flips dependent claims stale the instant a source's hash changes --
+zero agent tokens spent.
 
 Run: python server/watcher.py   (Ctrl+C to stop)
 """
@@ -21,10 +22,12 @@ from watchdog.observers import Observer
 
 import db
 from hashing import hash_file, hash_git_state
+from parsers.env import ENV_SOURCE_PREFIX, parse_env_hashes, resolve_env_path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GIT_DIR = REPO_ROOT / ".git"
 GIT_SOURCE_KEY = "git:HEAD"
+ENV_PATH = resolve_env_path()
 DEBOUNCE_SECONDS = 0.3
 GIT_POLL_INTERVAL_SECONDS = float(os.environ.get("ARGUSD_GIT_POLL_INTERVAL", "3"))
 
@@ -113,6 +116,34 @@ def invalidate_file_source(source_key: str, repo_root: Path) -> None:
         conn.close()
 
 
+def invalidate_env_source(env_path: Path) -> None:
+    """Diff old vs. new per-key hashes so only the changed key's claims go stale."""
+    conn = _get_conn()
+    try:
+        try:
+            new_hashes = parse_env_hashes(env_path)
+        except FileNotFoundError:
+            new_hashes = {}  # whole file gone -> every tracked key counts as changed
+        for source in db.list_sources_by_prefix(conn, ENV_SOURCE_PREFIX):
+            key = source["key"]
+            new_hash = new_hashes.get(key[len(ENV_SOURCE_PREFIX):])
+            if new_hash == source["last_hash"]:
+                continue
+            ids = db.mark_source_claims_stale(conn, key)
+            if new_hash is not None:
+                db.upsert_source(conn, key, new_hash)
+            if ids:
+                db.insert_invalidation_event(conn, key, len(ids))
+                log.info(
+                    "[STALE] %s changed at %s -> invalidated claim ids %s",
+                    key,
+                    db.now_iso(),
+                    ids,
+                )
+    finally:
+        conn.close()
+
+
 def invalidate_git_source(repo_root: Path) -> None:
     conn = _get_conn()
     try:
@@ -188,15 +219,19 @@ class Debouncer:
 class RepoChangeHandler(FileSystemEventHandler):
     """Watches ordinary repo files for content changes."""
 
-    def __init__(self, debouncer: Debouncer, repo_root: Path):
+    def __init__(self, debouncer: Debouncer, repo_root: Path, env_path: Path | None = None):
         self.debouncer = debouncer
         self.repo_root = repo_root
+        self.env_path = env_path if env_path is not None else repo_root / ".env"
 
     def _handle(self, raw_path: str) -> None:
         path = Path(raw_path)
         if is_ignored(path):
             return
-        self.debouncer.trigger(str(path), lambda: self._process(path))
+        if path.resolve() == self.env_path.resolve():
+            self.debouncer.trigger(str(path), lambda: invalidate_env_source(self.env_path))
+        else:
+            self.debouncer.trigger(str(path), lambda: self._process(path))
         # Editing a tracked file can dirty the working tree without
         # touching any .git/* file, so recheck git state on every edit too.
         self.debouncer.trigger(
@@ -247,10 +282,14 @@ class GitFileHandler(FileSystemEventHandler):
             self._maybe_trigger(event.dest_path)
 
 
-def build_observer(repo_root: Path, git_dir: Path, debouncer: Debouncer) -> Observer:
+def build_observer(
+    repo_root: Path, git_dir: Path, debouncer: Debouncer, env_path: Path | None = None
+) -> Observer:
     observer = Observer()
     observer.schedule(
-        RepoChangeHandler(debouncer, repo_root), str(repo_root), recursive=True
+        RepoChangeHandler(debouncer, repo_root, env_path),
+        str(repo_root),
+        recursive=True,
     )
     if git_dir.exists():
         observer.schedule(
@@ -276,10 +315,15 @@ def git_poll_loop(repo_root: Path, stop_event: threading.Event) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     db_path = os.environ.get("ARGUSD_DB_PATH", str(db.DEFAULT_DB_PATH))
-    log.info("Argusd watcher starting: repo_root=%s db=%s", REPO_ROOT, db_path)
+    log.info(
+        "Argusd watcher starting: repo_root=%s db=%s env=%s",
+        REPO_ROOT,
+        db_path,
+        ENV_PATH,
+    )
 
     debouncer = Debouncer(DEBOUNCE_SECONDS)
-    observer = build_observer(REPO_ROOT, GIT_DIR, debouncer)
+    observer = build_observer(REPO_ROOT, GIT_DIR, debouncer, ENV_PATH)
     observer.start()
 
     stop_event = threading.Event()

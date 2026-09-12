@@ -47,8 +47,8 @@ def check_freshness(claim_id: int) -> dict:
         if claim["status"] == "fresh":
             try:
                 current_hash = hash_source(claim["source_key"])
-            except FileNotFoundError:
-                current_hash = None  # a deleted source counts as changed
+            except (FileNotFoundError, KeyError):
+                current_hash = None  # a deleted source (file or .env key) counts as changed
             if current_hash != claim["source_hash"]:
                 db.mark_stale(conn, claim_id)
                 claim = db.get_claim(conn, claim_id)

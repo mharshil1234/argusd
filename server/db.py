@@ -74,6 +74,12 @@ def get_source(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
+def list_sources_by_prefix(conn: sqlite3.Connection, prefix: str) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM sources WHERE key LIKE ?", (prefix + "%",)
+    ).fetchall()
+
+
 # --- claims --------------------------------------------------------------
 
 def insert_claim(

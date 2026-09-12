@@ -4,17 +4,20 @@ Argusd timestamps claims an AI coding agent makes about a codebase and marks
 them stale when their source changes. The repository currently combines the
 Python SQLite/hash foundation with a read-only Next.js claims dashboard.
 
-## Current checkpoint: Hours 8–14
+## Current checkpoint: Hours 14–20
 
 - `server/db.py` owns the shared SQLite schema and writes runtime data to
   `argusd.db` at the repository root.
-- `server/hashing.py` hashes file content and git state (`git:HEAD`).
+- `server/hashing.py` hashes file content, git state (`git:HEAD`), and
+  individual `.env` keys (`.env:KEY`) via `server/parsers/env.py`.
 - `server/main.py` exposes `record_claim`, `check_freshness`, and `list_stale`
   over stdio or SSE/HTTP.
 - `server/watcher.py` is a standalone, always-on process that watches the
-  repo tree and `.git` directly, flips dependent claims stale the instant
-  their source changes, and logs every invalidation — no agent call
-  involved. See `server/README.md` for how to run it.
+  repo tree, `.git`, and `.env` directly, flips dependent claims stale the
+  instant their source changes — diffing old vs. new key hashes so an
+  `.env` edit only invalidates the changed key's claims — and logs every
+  invalidation. No agent call involved. See `server/README.md` for how to
+  run it.
 - `dashboard/` reads that same database without creating or migrating it,
   and exposes both `GET /api/claims` (manual/debug) and a live
   `GET /api/events` Server-Sent Events feed the UI subscribes to.
@@ -23,8 +26,8 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   reconnects.
 - `demo/` contains a repeatable file-backed stale-claim walkthrough.
 
-`.env` config-key claims and the dashboard's invalidation-timeline UI
-belong to Hours 14–20 and are intentionally not part of this checkpoint.
+Both halves of Hours 14–20 are done: config-key (`.env`) claims and the
+dashboard's invalidation-timeline/event-log UI.
 
 ## 1. Set up Python and initialize SQLite
 
@@ -126,9 +129,12 @@ the response. The reader opens SQLite read-only and never initializes or
 migrates the database.
 
 The verified development host used Node.js 25.6.1, npm 11.9.0, and Python
-3.12.14. The hash-change proof, stdio MCP integration client, and watcher
-proof (`server/test_watcher.py`) all pass; the SSE transport also starts
+3.12.14. The hash-change proof, stdio MCP integration client, watcher
+proof (`server/test_watcher.py`), and `.env` per-key proof
+(`server/test_env_parser.py`) all pass; the SSE transport also starts
 successfully and serves its event-stream handshake on `/sse`. End-to-end
 was also verified manually: with the watcher and dashboard both running,
 editing a file with a tracked claim produced a `[STALE]` log line and the
-same-second `stale` flip on the live dashboard, with no client polling.
+same-second `stale` flip on the live dashboard, with no client polling;
+editing one `.env` key while another was left untouched flipped only the
+changed key's claim.

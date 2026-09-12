@@ -31,9 +31,17 @@ what's still pending — this block only tracks what's actually done so far.
   repeatable file-backed stale-claim walkthrough over the real MCP stdio
   tools, proven by `demo/test_demo.py`; originally scheduled for Hours
   20–28 but landed early (`[B]`).
-- **Not yet started:** `.env`/config-key claims (Hours 14–20), the
-  dashboard's invalidation-timeline/event-log UI polish (Hours 14–20), and
-  full Claude Code agent integration (Hours 20–28+).
+- **Hours 14–20 — done.** `[A]` `server/parsers/env.py` hashes each `.env`
+  key's value individually; `hash_source(".env:KEY")` is implemented for
+  real (was a stub); `server/watcher.py` diffs old vs. new key-hash maps
+  on every `.env` save so only the changed key's claims go stale, proven
+  by `server/test_env_parser.py` and a live run (edit one key, only that
+  key's claim flips), and each invalidation is persisted via
+  `db.insert_invalidation_event`. `[B]` added the `invalidation_events`
+  table, a durable event-log UI on the dashboard (survives reloads), and a
+  watcher robustness fix (`Debouncer.close()` / `observer.unschedule_all()`
+  so no debounced callback fires after teardown).
+- **Not yet started:** full Claude Code agent integration (Hours 20–28+).
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 
