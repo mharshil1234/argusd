@@ -81,17 +81,29 @@ class DemoWorkflowTests(unittest.TestCase):
             env_after = (workspace / ".env").read_text(encoding="utf-8")
             self.assertNotEqual(env_after, env_before)
             self.assertIn("PORT=4000", env_after)
-            self.assertNotIn("4000", trigger.stdout)  # raw value never printed
+            # The mechanical report lines (Changed/check_freshness/list_stale)
+            # never print the raw value -- only the re-recorded claim's own
+            # agent-authored narrative text may mention it, same precedent
+            # as the seed claim's "port 3000" text.
+            mechanical_lines = "\n".join(
+                line for line in trigger.stdout.splitlines() if "re-recorded" not in line
+            )
+            self.assertNotIn("4000", mechanical_lines)
+            self.assertIn("re-recorded -> claim_id=4 (fresh)", trigger.stdout)
 
             database = sqlite3.connect(workspace / "argusd.db")
             try:
-                rows = database.execute("SELECT status, stale_at FROM claims ORDER BY id").fetchall()
+                rows = database.execute(
+                    "SELECT source_key, status, stale_at FROM claims ORDER BY id"
+                ).fetchall()
             finally:
                 database.close()
-            self.assertEqual(rows[0][0], "stale")  # auth: unchanged from before
-            self.assertEqual(rows[1], ("fresh", None))  # routes: still untouched
-            self.assertEqual(rows[2][0], "stale")  # env: just flipped
-            self.assertIsNotNone(rows[2][1])
+            self.assertEqual(len(rows), 4)  # the new re-recorded claim adds a 4th row
+            self.assertEqual(rows[0][1], "stale")  # auth: unchanged from before
+            self.assertEqual(rows[1][1:], ("fresh", None))  # routes: still untouched
+            self.assertEqual(rows[2][1], "stale")  # original env claim: just flipped
+            self.assertIsNotNone(rows[2][2])
+            self.assertEqual(rows[3], (".env:PORT", "fresh", None))  # re-verified belief
         finally:
             for _ in range(30):
                 try:

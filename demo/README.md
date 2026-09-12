@@ -67,7 +67,11 @@ and the dashboard updates live over its SSE feed — `trigger_change.py`'s own
 — purely narrative (Argusd hashes `auth.ts` itself; it has no import-graph
 tracking, which is explicitly out of scope). Use `--claim routes` for the
 other file claim, or `--claim env` to flip the seeded `PORT` value in
-`.env` — never the raw value, only the hash, is ever stored or printed.
+`.env`. Argusd's own storage/API never touches or exposes the raw value —
+only hashes — but `--claim env` also re-records an updated belief after
+the flip (agent-authored narrative text, same as the seed claim's own
+"port 3000" text), which shows up as a second, fresh `.env:PORT` claim
+right next to the now-stale original: drift caught, then re-verified.
 
 The generated workspace is ignored by Git and can be safely recreated with
 `--reset`. Each real invalidation — file, git-state, or `.env` key — is also
@@ -81,7 +85,9 @@ those events, and only the latest 20 are displayed.
 2. Start `server\watcher.py` with the generated database and `.env` paths.
 3. Start the dashboard and show the three fresh claims.
 4. Trigger `auth`, then `env`, and point out the live stale badges and durable
-   event entries. Ask Codex to call `list_stale` before continuing.
+   event entries. Note `env` also re-records an updated belief, which
+   appears fresh right next to the stale original — the full loop, not
+   just the drift. Ask Codex to call `list_stale` before continuing.
 5. Reload the dashboard to prove event history persists.
 
 If live editing or startup is unreliable during review, use
