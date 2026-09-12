@@ -6,7 +6,7 @@ body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Ari
 .eyebrow, .section-kicker, .summary-card > span, .poll-rate { color: var(--fresh); font: 700 11px/1.3 Consolas, monospace; letter-spacing: .12em; margin: 0; text-transform: uppercase; }
 h1 { font-size: clamp(40px, 6vw, 68px); letter-spacing: -.055em; line-height: .98; margin: 14px 0; }
 .lede { color: var(--muted); font-size: 17px; margin: 0; }
-.connection { align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; gap: 12px; min-width: 210px; padding: 14px 16px; }
+.connection { align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; gap: 12px; min-width: 230px; padding: 14px 16px; }
 .connection-dot, .status-dot { background: var(--fresh); border-radius: 50%; box-shadow: 0 0 16px color-mix(in srgb, var(--fresh) 65%, transparent); flex: 0 0 auto; height: 9px; width: 9px; }
 .connection div { display: grid; gap: 3px; }
 .connection strong { font-size: 13px; }
@@ -24,12 +24,15 @@ h1 { font-size: clamp(40px, 6vw, 68px); letter-spacing: -.055em; line-height: .9
 .panel-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding-bottom: 20px; }
 .section-kicker { color: var(--muted); }
 h2 { font-size: 24px; letter-spacing: -.025em; margin: 6px 0 0; }
+.panel-meta { align-items: center; color: var(--muted); display: flex; font: 11px Consolas, monospace; gap: 12px; text-transform: uppercase; }
 .poll-rate { background: #10241f; border: 1px solid #235345; border-radius: 999px; padding: 7px 10px; }
 .claims-list { display: grid; gap: 10px; padding-top: 16px; }
 .claim-row { align-items: center; background: var(--raised); border: 1px solid transparent; border-radius: 12px; display: flex; gap: 24px; justify-content: space-between; padding: 17px 18px; transition: border-color .2s, transform .2s; }
 .claim-row:hover { border-color: var(--line); transform: translateY(-1px); }
 .claim-copy { min-width: 0; }
 .claim-copy p { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.claim-source { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; }
+.claim-source > span { color: var(--muted); font: 10px Consolas, monospace; text-transform: uppercase; }
 .claim-copy code { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .claim-meta { align-items: flex-end; display: grid; flex: 0 0 auto; gap: 8px; justify-items: end; }
 .claim-meta time { color: var(--muted); font: 10px Consolas, monospace; }
@@ -42,8 +45,10 @@ h2 { font-size: 24px; letter-spacing: -.025em; margin: 6px 0 0; }
 .state-card p { margin: 0; }
 .state-card code { background: var(--canvas); border-radius: 8px; color: var(--fresh); max-width: 100%; overflow-wrap: anywhere; padding: 10px 12px; }
 .state-error { border-color: #6f2937; }
+.state-waiting { border-color: #6d5520; }
 .spinner { animation: spin 1s linear infinite; border: 2px solid var(--line); border-radius: 50%; border-top-color: var(--fresh); height: 22px; width: 22px; }
+.connection:focus-within, .claim-row:focus-within { border-color: var(--fresh); outline: 2px solid color-mix(in srgb, var(--fresh) 35%, transparent); outline-offset: 2px; }
 footer { color: var(--muted); display: flex; font: 11px Consolas, monospace; justify-content: space-between; padding: 20px 4px 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 760px) { .dashboard-shell { padding: 24px 16px; } .dashboard-header { align-items: stretch; flex-direction: column; } .connection { min-width: 0; } .summary-grid { grid-template-columns: 1fr; margin-top: 28px; } .claims-panel { padding: 18px; } .claim-row { align-items: flex-start; flex-direction: column; } .claim-meta { align-items: start; justify-items: start; } footer { flex-direction: column; gap: 8px; } }
+@media (max-width: 760px) { .dashboard-shell { padding: 24px 16px; } .dashboard-header { align-items: stretch; flex-direction: column; } .connection { min-width: 0; } .summary-grid { grid-template-columns: 1fr; margin-top: 28px; } .claims-panel { padding: 18px; } .panel-header { align-items: flex-start; gap: 16px; } .panel-meta { align-items: flex-end; flex-direction: column; gap: 8px; } .claim-row { align-items: flex-start; flex-direction: column; } .claim-meta { align-items: start; justify-items: start; } footer { flex-direction: column; gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .claim-row { transition: none; } .spinner { animation: none; } }
