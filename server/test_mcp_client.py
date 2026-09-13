@@ -63,6 +63,10 @@ async def main() -> None:
             async with ClientSession(read, write) as session:
                 await session.initialize()
 
+                tools = await session.list_tools()
+                tool_names = {tool.name for tool in tools.tools}
+                check("validate_claims is discoverable over stdio", "validate_claims" in tool_names)
+
                 # 1. record_claim
                 result = await session.call_tool(
                     "record_claim",
@@ -95,6 +99,12 @@ async def main() -> None:
                 print(f"list_stale -> {stale}")
                 stale_ids = [row["claim_id"] for row in stale]
                 check("claim_id appears in list_stale", claim_id in stale_ids)
+
+                result = await session.call_tool("validate_claims", {"claim_ids": [claim_id]})
+                gate = unwrap(result)
+                print(f"validate_claims -> {gate}")
+                check("validate_claims reports the changed claim", gate["status"] == "stale" and gate["stale_claims"][0]["claim_id"] == claim_id)
+                check("validate_claims response contains no hash", "hash" not in json.dumps(gate).lower())
 
     print("\nAll checks passed.")
 

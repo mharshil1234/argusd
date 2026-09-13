@@ -1,4 +1,4 @@
-"""Argusd MCP server: record_claim, check_freshness, list_stale.
+"""Argusd MCP server: claim recording, freshness checks, and stale audits.
 
 Wired to db.py against the repository-root SQLite file (argusd.db) so
 claims survive across tool calls within a session. Tool descriptions
@@ -36,25 +36,32 @@ def record_claim(text: str, source_key: str) -> int:
         conn.close()
 
 
+def _refresh_claim(conn, claim_id: int) -> dict:
+    claim = db.get_claim(conn, claim_id)
+    if claim is None:
+        raise ValueError(f"no claim with id {claim_id}")
+    if claim["status"] == "fresh":
+        try:
+            current_hash = hash_source(claim["source_key"])
+        except (FileNotFoundError, KeyError):
+            current_hash = None  # a deleted source counts as changed
+        if current_hash != claim["source_hash"]:
+            db.mark_stale(conn, claim_id)
+            claim = db.get_claim(conn, claim_id)
+    result = {"status": claim["status"]}
+    if claim["status"] == "stale":
+        result["changed_at"] = claim["stale_at"]
+        result["source_key"] = claim["source_key"]
+    return result
+
+
 @mcp.tool()
 def check_freshness(claim_id: int) -> dict:
     """Rehash a claim's source; flips it stale if changed. Returns status and changed_at if stale."""
     conn = _get_conn()
     try:
-        claim = db.get_claim(conn, claim_id)
-        if claim is None:
-            raise ValueError(f"no claim with id {claim_id}")
-        if claim["status"] == "fresh":
-            try:
-                current_hash = hash_source(claim["source_key"])
-            except (FileNotFoundError, KeyError):
-                current_hash = None  # a deleted source (file or .env key) counts as changed
-            if current_hash != claim["source_hash"]:
-                db.mark_stale(conn, claim_id)
-                claim = db.get_claim(conn, claim_id)
-        result = {"status": claim["status"]}
-        if claim["status"] == "stale":
-            result["changed_at"] = claim["stale_at"]
+        result = _refresh_claim(conn, claim_id)
+        result.pop("source_key", None)
         return result
     finally:
         conn.close()
@@ -66,6 +73,30 @@ def list_stale() -> list[dict]:
     conn = _get_conn()
     try:
         return [dict(row) for row in db.list_stale_claims(conn)]
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def validate_claims(claim_ids: list[int]) -> dict:
+    """Validate several claims before a risky action. Returns safe or stale."""
+    if not isinstance(claim_ids, list) or any(not isinstance(claim_id, int) for claim_id in claim_ids):
+        raise ValueError("claim_ids must be a list of integer claim IDs")
+    checked_at = db.now_iso()
+    conn = _get_conn()
+    try:
+        unique_ids = list(dict.fromkeys(claim_ids))
+        missing = [claim_id for claim_id in unique_ids if db.get_claim(conn, claim_id) is None]
+        if missing:
+            raise ValueError(f"no claims with id(s) {missing}")
+        stale_claims = []
+        for claim_id in unique_ids:
+            result = _refresh_claim(conn, claim_id)
+            if result["status"] == "stale":
+                stale_claims.append({"claim_id": claim_id, "source_key": result["source_key"], "changed_at": result["changed_at"]})
+        if not stale_claims:
+            return {"status": "safe", "checked_at": checked_at}
+        return {"status": "stale", "checked_at": checked_at, "stale_claims": stale_claims}
     finally:
         conn.close()
 
