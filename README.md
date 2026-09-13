@@ -11,7 +11,7 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
 - `server/hashing.py` hashes file content, git state (`git:HEAD`), and
   individual `.env` keys (`.env:KEY`) via `server/parsers/env.py`.
 - `server/main.py` exposes `record_claim`, `check_freshness`, and `list_stale`
-  over stdio or SSE/HTTP.
+  plus the multi-claim `validate_claims` preflight over stdio or SSE/HTTP.
 - `server/watcher.py` is a standalone, always-on process that watches the
   repo tree, `.git`, and `.env` directly, flips dependent claims stale the
   instant their source changes — diffing old vs. new key hashes so an
@@ -100,6 +100,11 @@ codex mcp get argusd
 The helper is idempotent; pass `-Force` only to replace an existing entry.
 Start a fresh Codex session after registration so it discovers the tools.
 
+Before a risky action, an agent can call `validate_claims([claim_id, ...])`.
+It returns `safe` when all claims still match their sources, or `stale` with
+the affected claim IDs and source keys. It is advisory and does not block
+shell commands automatically.
+
 For an HTTP/SSE client or MCP inspector:
 
 ```powershell
@@ -161,6 +166,12 @@ Dashboard checks run from `dashboard/`:
 npm.cmd test
 npm.cmd run lint
 npm.cmd run build
+```
+
+The MCP freshness-gate proof runs from `server/`:
+
+```powershell
+python server\test_validate_claims.py
 ```
 
 The test fixture verifies waiting and error states, fresh/stale counts,

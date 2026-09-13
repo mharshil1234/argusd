@@ -8,6 +8,8 @@ Exposes the three real tools from `CLAUDE.md`, wired to SQLite:
   marks the claim stale when it changed.
 - `list_stale() -> [{claim_id, text, source_key, stale_at}]` returns all stale
   claims.
+- `validate_claims(claim_ids) -> {status, checked_at, stale_claims?}` rechecks
+  several claims before a risky action and returns `safe` or `stale`.
 
 File, `git:`, and `.env:KEY` source keys are all supported now. `.env:KEY`
 hashes only that key's value (see `parsers/env.py`) — never the whole
@@ -66,11 +68,26 @@ read-only through its SSE feed, so the timeline survives browser reloads.
 
 ## Verify
 
-The integration client starts the server over stdio and calls all three tools:
+The integration client starts the server over stdio and calls all four tools:
 
 ```powershell
 python server\test_mcp_client.py
 ```
+
+The multi-claim freshness gate has dedicated edge-case coverage:
+
+```powershell
+python server\test_validate_claims.py
+```
+
+Recommended agent flow:
+
+```text
+record_claim -> work -> validate_claims -> proceed only if safe
+```
+
+The gate is advisory: it reports stale assumptions but does not intercept or
+block shell commands. A stale claim should be re-recorded after verification.
 
 The hash-change proof can also be run independently:
 

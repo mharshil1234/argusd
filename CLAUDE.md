@@ -120,6 +120,12 @@ what's still pending — this block only tracks what's actually done so far.
   report above. Workspace was reset back to a clean fresh state afterward
   via `--reset`.
 
+- **Product Phase 2 — freshness gate added.** `server/main.py` now exposes
+  `validate_claims`, allowing Codex or Claude to recheck several explicit
+  claim IDs before a risky action. The result is advisory, terse, and
+  hash-free; `server/test_validate_claims.py` covers changed, deleted,
+  missing, mixed, and already-stale claims.
+
 See `README.md` and `server/README.md` for exact run/verify commands.
 
 ## The problem
