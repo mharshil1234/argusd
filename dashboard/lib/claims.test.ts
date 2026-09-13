@@ -71,6 +71,8 @@ test("normalizes, sorts, and summarizes claims without exposing hashes", () => {
     assert.equal("sourceHash" in result.claims[0], false);
     assert.equal(result.claims[0].agentId, "unattributed");
     assert.equal(result.claims[0].sessionId, null);
+    assert.equal(result.claims[0].severity, "medium");
+    assert.equal(result.claims[0].recommendedAction, "reverify_before_continue");
   });
 });
 
@@ -87,6 +89,23 @@ test("returns agent and session ownership when the additive columns exist", () =
     const result = readClaims(dbPath);
     assert.equal(result.state, "ready");
     assert.deepEqual(result.claims[0] && { agentId: result.claims[0].agentId, sessionId: result.claims[0].sessionId }, { agentId: "codex", sessionId: "review-session" });
+    assert.equal(JSON.stringify(result).includes("private-hash"), false);
+  });
+});
+
+test("returns severity and recommended action when risk columns exist", () => {
+  withTempPath((dbPath) => {
+    const database = new Database(dbPath);
+    database.exec(`${schema}\nALTER TABLE claims ADD COLUMN severity TEXT NOT NULL DEFAULT 'medium';\nALTER TABLE claims ADD COLUMN recommended_action TEXT NOT NULL DEFAULT 'reverify_before_continue';`);
+    database.prepare(
+      `INSERT INTO claims (text, source_key, source_hash, created_at, severity, recommended_action, status, stale_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("critical claim", "deploy.ts", "private-hash", "2026-01-01T10:00:00Z", "critical", "stop_and_escalate", "stale", "2026-01-01T11:00:00Z");
+    database.close();
+
+    const result = readClaims(dbPath);
+    assert.equal(result.state, "ready");
+    assert.deepEqual(result.claims[0] && { severity: result.claims[0].severity, recommendedAction: result.claims[0].recommendedAction }, { severity: "critical", recommendedAction: "stop_and_escalate" });
     assert.equal(JSON.stringify(result).includes("private-hash"), false);
   });
 });

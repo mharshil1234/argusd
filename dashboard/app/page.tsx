@@ -11,13 +11,18 @@ function formatTimestamp(value: string | null): string {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
 }
 
+function formatAction(action: string): string {
+  return action.split("_").join(" ");
+}
+
 function ClaimRow({ claim }: { claim: DashboardClaim }) {
   const owner = claim.sessionId ? `${claim.agentId} / ${claim.sessionId}` : claim.agentId;
   return (
     <article className="claim-row">
-      <div className="claim-copy"><p>{claim.text}</p><div className="claim-context"><div className="claim-source"><span>Source</span><code>{claim.sourceKey}</code></div><div className="claim-owner"><span>Owner</span><code title={owner}>{owner}</code></div></div></div>
+      <div className="claim-copy"><p>{claim.text}</p><div className="claim-context"><div className="claim-source"><span>Source</span><code>{claim.sourceKey}</code></div><div className="claim-owner"><span>Owner</span><code title={owner}>{owner}</code></div></div>{claim.status === "stale" && <p className="claim-action"><span>Recommended</span>{formatAction(claim.recommendedAction)}</p>}</div>
       <div className="claim-meta">
         <span className={`status status-${claim.status}`} aria-label={`Claim status: ${claim.status}`}><span className="status-dot" aria-hidden="true" />{claim.status}</span>
+        <span className={`severity severity-${claim.severity}`} aria-label={`Claim severity: ${claim.severity}`}>{claim.severity}</span>
         <time dateTime={claim.staleAt ?? claim.createdAt}>{claim.status === "stale" ? "Changed" : "Recorded"} {formatTimestamp(claim.staleAt ?? claim.createdAt)}</time>
       </div>
     </article>

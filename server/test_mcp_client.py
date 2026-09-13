@@ -75,6 +75,7 @@ async def main() -> None:
                         "source_key": str(scratch_file),
                         "agent_id": "codex",
                         "session_id": "mcp-integration",
+                        "severity": "critical",
                     },
                 )
                 claim_id = unwrap(result)
@@ -97,6 +98,7 @@ async def main() -> None:
                 print(f"check_freshness (after edit) -> {verdict}")
                 check("claim flips stale after edit", verdict["status"] == "stale")
                 check("changed_at is present once stale", "changed_at" in verdict)
+                check("stale freshness check returns the risk action", verdict["severity"] == "critical" and verdict["recommended_action"] == "stop_and_escalate")
 
                 # 5. list_stale should surface the same claim
                 result = await session.call_tool("list_stale", {"session_id": "mcp-integration"})
@@ -105,11 +107,13 @@ async def main() -> None:
                 stale_ids = [row["claim_id"] for row in stale]
                 check("claim_id appears in list_stale", claim_id in stale_ids)
                 check("list_stale returns claim ownership", stale[0]["agent_id"] == "codex" and stale[0]["session_id"] == "mcp-integration")
+                check("list_stale returns severity and recommended action", stale[0]["severity"] == "critical" and stale[0]["recommended_action"] == "stop_and_escalate")
 
                 result = await session.call_tool("validate_claims", {"claim_ids": [claim_id]})
                 gate = unwrap(result)
                 print(f"validate_claims -> {gate}")
                 check("validate_claims reports the changed claim", gate["status"] == "stale" and gate["stale_claims"][0]["claim_id"] == claim_id)
+                check("validate_claims returns the risk action", gate["stale_claims"][0]["recommended_action"] == "stop_and_escalate")
                 check("validate_claims response contains no hash", "hash" not in json.dumps(gate).lower())
 
     print("\nAll checks passed.")

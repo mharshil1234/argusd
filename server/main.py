@@ -46,8 +46,9 @@ def record_claim(
     source_key: str,
     agent_id: str | None = None,
     session_id: str | None = None,
+    severity: str = "medium",
 ) -> int:
-    """Record a fresh claim. Optional agent_id and non-secret session_id identify its owner."""
+    """Record a fresh claim. Severity is low, medium, high, or critical."""
     conn = _get_conn()
     try:
         source_hash = hash_source(source_key)
@@ -58,6 +59,7 @@ def record_claim(
             source_hash,
             agent_id=_identity(agent_id, "ARGUSD_AGENT_ID", "unattributed"),
             session_id=_identity(session_id, "ARGUSD_SESSION_ID", None),
+            severity=severity,
         )
     finally:
         conn.close()
@@ -79,12 +81,14 @@ def _refresh_claim(conn, claim_id: int) -> dict:
     if claim["status"] == "stale":
         result["changed_at"] = claim["stale_at"]
         result["source_key"] = claim["source_key"]
+        result["severity"] = claim["severity"]
+        result["recommended_action"] = claim["recommended_action"]
     return result
 
 
 @mcp.tool()
 def check_freshness(claim_id: int) -> dict:
-    """Rehash a claim's source; flips it stale if changed. Returns status and changed_at if stale."""
+    """Rehash a claim; stale results include severity and a recommended action."""
     conn = _get_conn()
     try:
         result = _refresh_claim(conn, claim_id)
@@ -96,7 +100,7 @@ def check_freshness(claim_id: int) -> dict:
 
 @mcp.tool()
 def list_stale(session_id: str | None = None) -> list[dict]:
-    """List stale claims. Pass a non-secret session_id to scope the result."""
+    """List stale claims with severity/action. Pass session_id to scope the result."""
     conn = _get_conn()
     try:
         owner_session = _identity(session_id, "ARGUSD_SESSION_ID", None) if session_id is not None else None
@@ -121,7 +125,15 @@ def validate_claims(claim_ids: list[int]) -> dict:
         for claim_id in unique_ids:
             result = _refresh_claim(conn, claim_id)
             if result["status"] == "stale":
-                stale_claims.append({"claim_id": claim_id, "source_key": result["source_key"], "changed_at": result["changed_at"]})
+                stale_claims.append(
+                    {
+                        "claim_id": claim_id,
+                        "source_key": result["source_key"],
+                        "changed_at": result["changed_at"],
+                        "severity": result["severity"],
+                        "recommended_action": result["recommended_action"],
+                    }
+                )
         if not stale_claims:
             return {"status": "safe", "checked_at": checked_at}
         return {"status": "stale", "checked_at": checked_at, "stale_claims": stale_claims}

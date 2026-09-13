@@ -10,6 +10,14 @@ from pathlib import Path
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "argusd.db"
 
+SEVERITIES = ("low", "medium", "high", "critical")
+ACTION_BY_SEVERITY = {
+    "low": "review_before_next_change",
+    "medium": "reverify_before_continue",
+    "high": "pause_and_reverify",
+    "critical": "stop_and_escalate",
+}
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS claims (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,6 +27,8 @@ CREATE TABLE IF NOT EXISTS claims (
     created_at TEXT NOT NULL,
     agent_id TEXT NOT NULL DEFAULT 'unattributed',
     session_id TEXT,
+    severity TEXT NOT NULL DEFAULT 'medium',
+    recommended_action TEXT NOT NULL DEFAULT 'reverify_before_continue',
     status TEXT NOT NULL DEFAULT 'fresh', -- 'fresh' | 'stale'
     stale_at TEXT
 );
@@ -63,6 +73,12 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
     if "session_id" not in columns:
         conn.execute("ALTER TABLE claims ADD COLUMN session_id TEXT")
+    if "severity" not in columns:
+        conn.execute("ALTER TABLE claims ADD COLUMN severity TEXT NOT NULL DEFAULT 'medium'")
+    if "recommended_action" not in columns:
+        conn.execute(
+            "ALTER TABLE claims ADD COLUMN recommended_action TEXT NOT NULL DEFAULT 'reverify_before_continue'"
+        )
     conn.commit()
 
 
@@ -96,6 +112,12 @@ def list_sources_by_prefix(conn: sqlite3.Connection, prefix: str) -> list[sqlite
 
 # --- claims --------------------------------------------------------------
 
+def action_for_severity(severity: str) -> str:
+    if severity not in SEVERITIES:
+        allowed = ", ".join(SEVERITIES)
+        raise ValueError(f"severity must be one of: {allowed}")
+    return ACTION_BY_SEVERITY[severity]
+
 def insert_claim(
     conn: sqlite3.Connection,
     text: str,
@@ -103,15 +125,27 @@ def insert_claim(
     source_hash: str,
     agent_id: str = "unattributed",
     session_id: str | None = None,
+    severity: str = "medium",
 ) -> int:
+    recommended_action = action_for_severity(severity)
     cur = conn.execute(
         """
         INSERT INTO claims (
-            text, source_key, source_hash, created_at, agent_id, session_id, status
+            text, source_key, source_hash, created_at, agent_id, session_id,
+            severity, recommended_action, status
         )
-        VALUES (?, ?, ?, ?, ?, ?, 'fresh')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'fresh')
         """,
-        (text, source_key, source_hash, now_iso(), agent_id, session_id),
+        (
+            text,
+            source_key,
+            source_hash,
+            now_iso(),
+            agent_id,
+            session_id,
+            severity,
+            recommended_action,
+        ),
     )
     conn.commit()
     new_id = cur.lastrowid
@@ -171,7 +205,8 @@ def list_stale_claims(
     conn: sqlite3.Connection, session_id: str | None = None
 ) -> list[sqlite3.Row]:
     query = """
-        SELECT id AS claim_id, text, source_key, stale_at, agent_id, session_id
+        SELECT id AS claim_id, text, source_key, stale_at, agent_id, session_id,
+               severity, recommended_action
         FROM claims
         WHERE status = 'stale'
     """
