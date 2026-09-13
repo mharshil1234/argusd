@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS claims (
     source_key TEXT NOT NULL,
     source_hash TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    agent_id TEXT NOT NULL DEFAULT 'unattributed',
+    session_id TEXT,
     status TEXT NOT NULL DEFAULT 'fresh', -- 'fresh' | 'stale'
     stale_at TEXT
 );
@@ -49,6 +51,18 @@ def connect(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    # Claims databases created before ownership support must remain readable.
+    # SQLite only supports additive ALTER TABLE migrations, which is exactly
+    # what this feature needs.
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(claims)").fetchall()
+    }
+    if "agent_id" not in columns:
+        conn.execute(
+            "ALTER TABLE claims ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'unattributed'"
+        )
+    if "session_id" not in columns:
+        conn.execute("ALTER TABLE claims ADD COLUMN session_id TEXT")
     conn.commit()
 
 
@@ -83,14 +97,21 @@ def list_sources_by_prefix(conn: sqlite3.Connection, prefix: str) -> list[sqlite
 # --- claims --------------------------------------------------------------
 
 def insert_claim(
-    conn: sqlite3.Connection, text: str, source_key: str, source_hash: str
+    conn: sqlite3.Connection,
+    text: str,
+    source_key: str,
+    source_hash: str,
+    agent_id: str = "unattributed",
+    session_id: str | None = None,
 ) -> int:
     cur = conn.execute(
         """
-        INSERT INTO claims (text, source_key, source_hash, created_at, status)
-        VALUES (?, ?, ?, ?, 'fresh')
+        INSERT INTO claims (
+            text, source_key, source_hash, created_at, agent_id, session_id, status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'fresh')
         """,
-        (text, source_key, source_hash, now_iso()),
+        (text, source_key, source_hash, now_iso(), agent_id, session_id),
     )
     conn.commit()
     new_id = cur.lastrowid
@@ -146,10 +167,19 @@ def mark_source_claims_stale(conn: sqlite3.Connection, source_key: str) -> list[
     return ids
 
 
-def list_stale_claims(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute(
-        "SELECT id AS claim_id, text, source_key, stale_at FROM claims WHERE status = 'stale'"
-    ).fetchall()
+def list_stale_claims(
+    conn: sqlite3.Connection, session_id: str | None = None
+) -> list[sqlite3.Row]:
+    query = """
+        SELECT id AS claim_id, text, source_key, stale_at, agent_id, session_id
+        FROM claims
+        WHERE status = 'stale'
+    """
+    params: tuple[str, ...] = ()
+    if session_id is not None:
+        query += " AND session_id = ?"
+        params = (session_id,)
+    return conn.execute(query + " ORDER BY stale_at DESC, id DESC", params).fetchall()
 
 
 def insert_invalidation_event(

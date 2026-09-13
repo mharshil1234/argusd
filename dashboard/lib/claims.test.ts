@@ -69,6 +69,25 @@ test("normalizes, sorts, and summarizes claims without exposing hashes", () => {
     assert.equal(result.claims[1].staleAt, null);
     assert.equal(JSON.stringify(result).includes("secret-"), false);
     assert.equal("sourceHash" in result.claims[0], false);
+    assert.equal(result.claims[0].agentId, "unattributed");
+    assert.equal(result.claims[0].sessionId, null);
+  });
+});
+
+test("returns agent and session ownership when the additive columns exist", () => {
+  withTempPath((dbPath) => {
+    const database = new Database(dbPath);
+    database.exec(`${schema}\nALTER TABLE claims ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'unattributed';\nALTER TABLE claims ADD COLUMN session_id TEXT;`);
+    database.prepare(
+      `INSERT INTO claims (text, source_key, source_hash, created_at, agent_id, session_id, status, stale_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run("owned claim", "auth.ts", "private-hash", "2026-01-01T10:00:00Z", "codex", "review-session", "fresh", null);
+    database.close();
+
+    const result = readClaims(dbPath);
+    assert.equal(result.state, "ready");
+    assert.deepEqual(result.claims[0] && { agentId: result.claims[0].agentId, sessionId: result.claims[0].sessionId }, { agentId: "codex", sessionId: "review-session" });
+    assert.equal(JSON.stringify(result).includes("private-hash"), false);
   });
 });
 

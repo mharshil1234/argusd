@@ -32,8 +32,9 @@ h2 { font-size: 24px; letter-spacing: -.025em; margin: 6px 0 0; }
 .claim-row:hover { border-color: var(--line); transform: translateY(-1px); }
 .claim-copy { min-width: 0; }
 .claim-copy p { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
-.claim-source { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; }
-.claim-source > span { color: var(--muted); font: 10px Consolas, monospace; text-transform: uppercase; }
+.claim-context { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.claim-source, .claim-owner { align-items: baseline; display: flex; flex-wrap: wrap; gap: 8px; }
+.claim-source > span, .claim-owner > span { color: var(--muted); font: 10px Consolas, monospace; text-transform: uppercase; }
 .claim-copy code { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .claim-meta { align-items: flex-end; display: grid; flex: 0 0 auto; gap: 8px; justify-items: end; }
 .claim-meta time { color: var(--muted); font: 10px Consolas, monospace; }

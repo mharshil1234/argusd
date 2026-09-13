@@ -12,9 +12,10 @@ function formatTimestamp(value: string | null): string {
 }
 
 function ClaimRow({ claim }: { claim: DashboardClaim }) {
+  const owner = claim.sessionId ? `${claim.agentId} / ${claim.sessionId}` : claim.agentId;
   return (
     <article className="claim-row">
-      <div className="claim-copy"><p>{claim.text}</p><div className="claim-source"><span>Source</span><code>{claim.sourceKey}</code></div></div>
+      <div className="claim-copy"><p>{claim.text}</p><div className="claim-context"><div className="claim-source"><span>Source</span><code>{claim.sourceKey}</code></div><div className="claim-owner"><span>Owner</span><code title={owner}>{owner}</code></div></div></div>
       <div className="claim-meta">
         <span className={`status status-${claim.status}`} aria-label={`Claim status: ${claim.status}`}><span className="status-dot" aria-hidden="true" />{claim.status}</span>
         <time dateTime={claim.staleAt ?? claim.createdAt}>{claim.status === "stale" ? "Changed" : "Recorded"} {formatTimestamp(claim.staleAt ?? claim.createdAt)}</time>

@@ -70,7 +70,12 @@ async def main() -> None:
                 # 1. record_claim
                 result = await session.call_tool(
                     "record_claim",
-                    {"text": "no other files import this", "source_key": str(scratch_file)},
+                    {
+                        "text": "no other files import this",
+                        "source_key": str(scratch_file),
+                        "agent_id": "codex",
+                        "session_id": "mcp-integration",
+                    },
                 )
                 claim_id = unwrap(result)
                 print(f"record_claim -> claim_id={claim_id}")
@@ -94,11 +99,12 @@ async def main() -> None:
                 check("changed_at is present once stale", "changed_at" in verdict)
 
                 # 5. list_stale should surface the same claim
-                result = await session.call_tool("list_stale", {})
+                result = await session.call_tool("list_stale", {"session_id": "mcp-integration"})
                 stale = unwrap(result)
                 print(f"list_stale -> {stale}")
                 stale_ids = [row["claim_id"] for row in stale]
                 check("claim_id appears in list_stale", claim_id in stale_ids)
+                check("list_stale returns claim ownership", stale[0]["agent_id"] == "codex" and stale[0]["session_id"] == "mcp-integration")
 
                 result = await session.call_tool("validate_claims", {"claim_ids": [claim_id]})
                 gate = unwrap(result)

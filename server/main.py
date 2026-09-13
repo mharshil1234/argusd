@@ -17,6 +17,21 @@ from hashing import hash_source
 
 mcp = FastMCP("argusd")
 
+MAX_IDENTITY_LENGTH = 128
+
+
+def _identity(value: str | None, env_name: str, fallback: str | None) -> str | None:
+    """Resolve a display-safe, non-secret ownership identifier."""
+    resolved = value if value is not None else os.environ.get(env_name, fallback)
+    if resolved is None:
+        return None
+    if not isinstance(resolved, str):
+        raise ValueError(f"{env_name.lower()} must be a string")
+    normalized = resolved.strip()
+    if not normalized or len(normalized) > MAX_IDENTITY_LENGTH:
+        raise ValueError(f"{env_name.lower()} must be 1-{MAX_IDENTITY_LENGTH} characters")
+    return normalized
+
 
 def _get_conn():
     db_path = Path(os.environ.get("ARGUSD_DB_PATH", db.DEFAULT_DB_PATH))
@@ -26,12 +41,24 @@ def _get_conn():
 
 
 @mcp.tool()
-def record_claim(text: str, source_key: str) -> int:
-    """Record a claim tied to a source (file path). Hashes it now, stores it fresh. Returns claim_id."""
+def record_claim(
+    text: str,
+    source_key: str,
+    agent_id: str | None = None,
+    session_id: str | None = None,
+) -> int:
+    """Record a fresh claim. Optional agent_id and non-secret session_id identify its owner."""
     conn = _get_conn()
     try:
         source_hash = hash_source(source_key)
-        return db.insert_claim(conn, text, source_key, source_hash)
+        return db.insert_claim(
+            conn,
+            text,
+            source_key,
+            source_hash,
+            agent_id=_identity(agent_id, "ARGUSD_AGENT_ID", "unattributed"),
+            session_id=_identity(session_id, "ARGUSD_SESSION_ID", None),
+        )
     finally:
         conn.close()
 
@@ -68,11 +95,12 @@ def check_freshness(claim_id: int) -> dict:
 
 
 @mcp.tool()
-def list_stale() -> list[dict]:
-    """List every claim currently marked stale (id, text, source_key, stale_at)."""
+def list_stale(session_id: str | None = None) -> list[dict]:
+    """List stale claims. Pass a non-secret session_id to scope the result."""
     conn = _get_conn()
     try:
-        return [dict(row) for row in db.list_stale_claims(conn)]
+        owner_session = _identity(session_id, "ARGUSD_SESSION_ID", None) if session_id is not None else None
+        return [dict(row) for row in db.list_stale_claims(conn, owner_session)]
     finally:
         conn.close()
 
