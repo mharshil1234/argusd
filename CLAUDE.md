@@ -120,13 +120,16 @@ what's still pending — this block only tracks what's actually done so far.
   report above. Workspace was reset back to a clean fresh state afterward
   via `--reset`.
 
-- **Product Phase 2 — freshness gate and ownership added.** `server/main.py`
+- **Product Phase 2 — freshness gate, ownership, and risk guidance added.** `server/main.py`
   exposes `validate_claims`, allowing Codex or Claude to recheck several
   explicit claim IDs before a risky action. Claims may include non-secret
   `agent_id` and `session_id` ownership labels; older rows are safely
-  `unattributed`, and the dashboard displays ownership read-only. The gate is
-  advisory, terse, and hash-free; `server/test_validate_claims.py` and
-  `server/test_ownership.py` cover its edge cases and the additive migration.
+  `unattributed`, and the dashboard displays ownership read-only. Claims may
+  also declare low/medium/high/critical severity; stale results include an
+  advisory server-owned recommended action, while never blocking commands.
+  The gate is terse and hash-free; `server/test_validate_claims.py`,
+  `server/test_ownership.py`, and `server/test_severity.py` cover its edge
+  cases and additive migrations.
 
 See `README.md` and `server/README.md` for exact run/verify commands.
 
@@ -186,6 +189,8 @@ CREATE TABLE claims (
     created_at TEXT NOT NULL,
     agent_id TEXT NOT NULL DEFAULT 'unattributed', -- display-only ownership
     session_id TEXT,                               -- optional, non-secret
+    severity TEXT NOT NULL DEFAULT 'medium',
+    recommended_action TEXT NOT NULL DEFAULT 'reverify_before_continue',
     status TEXT NOT NULL DEFAULT 'fresh', -- 'fresh' | 'stale'
     stale_at TEXT
 );
@@ -235,12 +240,12 @@ timestamp, never full file contents). This keeps token overhead small — the
 schema for these three tools sits in the agent's context every turn
 regardless of use.
 
-- `record_claim(text: str, source_key: str, agent_id?: str, session_id?: str) -> claim_id`
+- `record_claim(text: str, source_key: str, agent_id?: str, session_id?: str, severity?: str) -> claim_id`
   Hashes the source right now, stores the claim as fresh.
-- `check_freshness(claim_id: int) -> {status, changed_at?}`
+- `check_freshness(claim_id: int) -> {status, changed_at?, severity?, recommended_action?}`
   Rehashes the source, compares to the stored hash, flips status if
   different, returns the verdict.
-- `list_stale(session_id?: str) -> [{claim_id, text, source_key, stale_at, agent_id, session_id}]`
+- `list_stale(session_id?: str) -> [{claim_id, text, source_key, stale_at, agent_id, session_id, severity, recommended_action}]`
   Everything currently stale — meant to be called by the agent at the start
   of a task or before a risky action, as a self-audit. A session ID scopes the
   result to one agent session.

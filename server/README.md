@@ -2,12 +2,13 @@
 
 Exposes the real claim tools from `CLAUDE.md`, wired to SQLite:
 
-- `record_claim(text, source_key, agent_id?, session_id?) -> claim_id` hashes
-  the source and stores a fresh claim with optional ownership metadata.
+- `record_claim(text, source_key, agent_id?, session_id?, severity?) -> claim_id`
+  hashes the source and stores a fresh claim with ownership/risk metadata.
 - `check_freshness(claim_id) -> {status, changed_at?}` rehashes its source and
   marks the claim stale when it changed.
 - `list_stale(session_id?) -> [{claim_id, text, source_key, stale_at,
-  agent_id, session_id}]` returns all stale claims or one session's claims.
+  agent_id, session_id, severity, recommended_action}]` returns all stale
+  claims or one session's claims.
 - `validate_claims(claim_ids) -> {status, checked_at, stale_claims?}` rechecks
   several claims before a risky action and returns `safe` or `stale`.
 
@@ -27,6 +28,25 @@ the two nullable/additive columns, so existing SQLite databases stay valid.
 
 Use short, non-secret identifiers such as `codex` and `review-42`. Never use
 tokens, API keys, raw config values, emails, or any other sensitive data.
+
+## Claim severity and recommended actions
+
+Every claim has a severity: `low`, `medium`, `high`, or `critical`; omitted
+values default to `medium`. Argusd validates the value when recording a claim
+and stores the associated advisory action with it:
+
+| Severity | Action returned after staleness |
+| --- | --- |
+| `low` | `review_before_next_change` |
+| `medium` | `reverify_before_continue` |
+| `high` | `pause_and_reverify` |
+| `critical` | `stop_and_escalate` |
+
+For example, record a deployment assumption with `severity="critical"`.
+When it becomes stale, the action appears in `check_freshness`, `list_stale`,
+and `validate_claims`. This is guidance for the agent, not automatic command
+enforcement. Existing SQLite databases receive additive risk columns and
+default old claims to `medium` / `reverify_before_continue`.
 
 ## Setup
 
@@ -93,6 +113,7 @@ The multi-claim freshness gate has dedicated edge-case coverage:
 ```powershell
 python server\test_validate_claims.py
 python server\test_ownership.py
+python server\test_severity.py
 ```
 
 Recommended agent flow:

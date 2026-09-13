@@ -12,7 +12,8 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   individual `.env` keys (`.env:KEY`) via `server/parsers/env.py`.
 - `server/main.py` exposes `record_claim`, `check_freshness`, `list_stale`,
   and the multi-claim `validate_claims` preflight over stdio or SSE/HTTP.
-  Claims can also carry a display-safe agent and session owner.
+  Claims can also carry a display-safe agent/session owner, severity, and an
+  advisory recommended action when stale.
 - `server/watcher.py` is a standalone, always-on process that watches the
   repo tree, `.git`, and `.env` directly, flips dependent claims stale the
   instant their source changes — diffing old vs. new key hashes so an
@@ -25,7 +26,7 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
 - The live dashboard includes a durable invalidation timeline backed by the
   `invalidation_events` table; recent events survive page reloads and feed
   reconnects. It displays the owner of each claim without exposing source
-  hashes or raw configuration values.
+  hashes or raw configuration values, plus severity and stale-claim guidance.
 - `demo/` contains a repeatable file-backed stale-claim walkthrough.
 
 Hours 20–28 integration and the Hours 28–33 full run-throughs are complete.
@@ -129,6 +130,24 @@ Do not put API keys, `.env` values, tokens, emails, or other sensitive data
 in either identifier. Older database rows remain readable and appear as
 `unattributed` with no session.
 
+### Set claim severity and act on stale results
+
+`record_claim` also accepts a `severity`: `low`, `medium` (the default),
+`high`, or `critical`. Severity is advisory; Argusd never blocks shell or
+Git commands automatically. When a claim is stale, `check_freshness`,
+`list_stale`, and `validate_claims` return its server-assigned action:
+
+| Severity | Recommended action |
+| --- | --- |
+| Low | `review_before_next_change` |
+| Medium | `reverify_before_continue` |
+| High | `pause_and_reverify` |
+| Critical | `stop_and_escalate` |
+
+For example, use `severity="critical"` for a production deployment or
+security assumption. The dashboard makes the severity and action visible on
+each stale claim. Existing database rows migrate to medium severity.
+
 For an HTTP/SSE client or MCP inspector:
 
 ```powershell
@@ -197,6 +216,7 @@ The MCP freshness-gate proof runs from `server/`:
 ```powershell
 python server\test_validate_claims.py
 python server\test_ownership.py
+python server\test_severity.py
 ```
 
 The test fixture verifies waiting and error states, fresh/stale counts,
