@@ -1,19 +1,32 @@
 # Argusd MCP server
 
-Exposes the three real tools from `CLAUDE.md`, wired to SQLite:
+Exposes the real claim tools from `CLAUDE.md`, wired to SQLite:
 
-- `record_claim(text, source_key) -> claim_id` hashes the source and stores a
-  fresh claim.
+- `record_claim(text, source_key, agent_id?, session_id?) -> claim_id` hashes
+  the source and stores a fresh claim with optional ownership metadata.
 - `check_freshness(claim_id) -> {status, changed_at?}` rehashes its source and
   marks the claim stale when it changed.
-- `list_stale() -> [{claim_id, text, source_key, stale_at}]` returns all stale
-  claims.
+- `list_stale(session_id?) -> [{claim_id, text, source_key, stale_at,
+  agent_id, session_id}]` returns all stale claims or one session's claims.
 - `validate_claims(claim_ids) -> {status, checked_at, stale_claims?}` rechecks
   several claims before a risky action and returns `safe` or `stale`.
 
 File, `git:`, and `.env:KEY` source keys are all supported now. `.env:KEY`
 hashes only that key's value (see `parsers/env.py`) — never the whole
 file, and never the raw value.
+
+## Claim ownership
+
+Argusd supports light attribution for shared agent work. `agent_id` and
+`session_id` are optional display labels stored with a claim; they are not
+authentication or authorization. Pass them directly to `record_claim`, or
+set `ARGUSD_AGENT_ID` and `ARGUSD_SESSION_ID` before starting the MCP server.
+Existing two-argument `record_claim` calls still work and are stored as
+`agent_id="unattributed"` with no session. The startup migration only adds
+the two nullable/additive columns, so existing SQLite databases stay valid.
+
+Use short, non-secret identifiers such as `codex` and `review-42`. Never use
+tokens, API keys, raw config values, emails, or any other sensitive data.
 
 ## Setup
 
@@ -68,7 +81,8 @@ read-only through its SSE feed, so the timeline survives browser reloads.
 
 ## Verify
 
-The integration client starts the server over stdio and calls all four tools:
+The integration client starts the server over stdio and exercises the MCP
+tools, including session ownership:
 
 ```powershell
 python server\test_mcp_client.py
@@ -78,6 +92,7 @@ The multi-claim freshness gate has dedicated edge-case coverage:
 
 ```powershell
 python server\test_validate_claims.py
+python server\test_ownership.py
 ```
 
 Recommended agent flow:

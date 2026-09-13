@@ -10,8 +10,9 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   `argusd.db` at the repository root.
 - `server/hashing.py` hashes file content, git state (`git:HEAD`), and
   individual `.env` keys (`.env:KEY`) via `server/parsers/env.py`.
-- `server/main.py` exposes `record_claim`, `check_freshness`, and `list_stale`
-  plus the multi-claim `validate_claims` preflight over stdio or SSE/HTTP.
+- `server/main.py` exposes `record_claim`, `check_freshness`, `list_stale`,
+  and the multi-claim `validate_claims` preflight over stdio or SSE/HTTP.
+  Claims can also carry a display-safe agent and session owner.
 - `server/watcher.py` is a standalone, always-on process that watches the
   repo tree, `.git`, and `.env` directly, flips dependent claims stale the
   instant their source changes — diffing old vs. new key hashes so an
@@ -23,7 +24,8 @@ Python SQLite/hash foundation with a read-only Next.js claims dashboard.
   `GET /api/events` Server-Sent Events feed the UI subscribes to.
 - The live dashboard includes a durable invalidation timeline backed by the
   `invalidation_events` table; recent events survive page reloads and feed
-  reconnects.
+  reconnects. It displays the owner of each claim without exposing source
+  hashes or raw configuration values.
 - `demo/` contains a repeatable file-backed stale-claim walkthrough.
 
 Hours 20–28 integration and the Hours 28–33 full run-throughs are complete.
@@ -105,6 +107,28 @@ It returns `safe` when all claims still match their sources, or `stale` with
 the affected claim IDs and source keys. It is advisory and does not block
 shell commands automatically.
 
+### Attribute claims to an agent session
+
+`record_claim` accepts optional `agent_id` and `session_id` strings. Use
+short, non-secret display identifiers so a shared dashboard can distinguish
+which agent session recorded a belief:
+
+```text
+record_claim(
+  text="The auth module uses the current session contract.",
+  source_key="src/auth.ts",
+  agent_id="codex",
+  session_id="review-42"
+)
+```
+
+The MCP server also reads `ARGUSD_AGENT_ID` and `ARGUSD_SESSION_ID` when
+those arguments are omitted. `list_stale(session_id="review-42")` limits a
+stale audit to that session; `list_stale()` remains the cross-session view.
+Do not put API keys, `.env` values, tokens, emails, or other sensitive data
+in either identifier. Older database rows remain readable and appear as
+`unattributed` with no session.
+
 For an HTTP/SSE client or MCP inspector:
 
 ```powershell
@@ -172,6 +196,7 @@ The MCP freshness-gate proof runs from `server/`:
 
 ```powershell
 python server\test_validate_claims.py
+python server\test_ownership.py
 ```
 
 The test fixture verifies waiting and error states, fresh/stale counts,
