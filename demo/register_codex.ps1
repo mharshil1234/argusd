@@ -3,6 +3,7 @@ param([switch]$Force)
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+$server = Join-Path $repoRoot "server\main.py"
 
 if (-not (Test-Path -LiteralPath $python)) {
     throw "Argusd interpreter not found at $python. Create .venv and install server\requirements.txt first."
@@ -25,10 +26,7 @@ if ($exists) {
     if ($LASTEXITCODE -ne 0) { throw "Unable to remove the existing Codex MCP registration." }
 }
 
-Push-Location $repoRoot
-try {
-    & codex mcp add argusd -- ".venv\Scripts\python.exe" "server\main.py"
-    if ($LASTEXITCODE -ne 0) { throw "Codex MCP registration failed." }
-} finally { Pop-Location }
+& codex mcp add argusd -- $python $server
+if ($LASTEXITCODE -ne 0) { throw "Codex MCP registration failed." }
 
-Write-Output "Registered Argusd with Codex from $repoRoot."
+Write-Output "Registered Argusd with Codex using absolute project paths."

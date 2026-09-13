@@ -100,8 +100,9 @@ powershell -ExecutionPolicy Bypass -File demo\register_codex.ps1
 codex mcp get argusd
 ```
 
-The helper is idempotent; pass `-Force` only to replace an existing entry.
-Start a fresh Codex session after registration so it discovers the tools.
+The helper is idempotent and records absolute interpreter/server paths; pass
+`-Force` only to replace an existing entry. Start a fresh Codex session after
+registration so it discovers the tools.
 
 Before a risky action, an agent can call `validate_claims([claim_id, ...])`.
 It returns `safe` when all claims still match their sources, or `stale` with

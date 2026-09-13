@@ -15,8 +15,9 @@ powershell -ExecutionPolicy Bypass -File demo\register_codex.ps1
 codex mcp get argusd
 ```
 
-The helper will not create a duplicate registration. Use `-Force` to replace
-an existing `argusd` entry, then start a fresh Codex session.
+The helper will not create a duplicate registration and stores absolute
+interpreter/server paths. Use `-Force` to replace an existing `argusd` entry,
+then start a fresh Codex session.
 
 ## Run the demo
 
